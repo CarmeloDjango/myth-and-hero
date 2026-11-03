@@ -18,6 +18,7 @@ import {
 } from "@/lib/characters/detail";
 import { getDb } from "@/lib/db";
 import { characterPictureSrc, heroImageSrc, isPhotoPicture } from "@/lib/heroes/image";
+import { cardTint } from "@/lib/characters/browse";
 import { isChoseongOnly } from "@/lib/search/choseong";
 
 import { visibleCharacterWhere, visibleSeriesWhere } from "./visibility";
@@ -72,7 +73,6 @@ export async function getCharacterPage(
         id: true,
         slug: true,
         name: true,
-        originalName: true,
         title: true,
         rarity: true,
         stat1: true,
@@ -82,7 +82,7 @@ export async function getCharacterPage(
         imageUrl: true,
         // 공식 인물에 우리 가족이 붙인 그림
         familyPictures: { where: { familyId: familyId ?? "-" }, select: { imageUrl: true }, take: 1 },
-        kind: { select: { name: true } },
+        kind: { select: { name: true, color: true } },
         faction: { select: { name: true, color: true } },
       },
     }),
@@ -96,7 +96,6 @@ export async function getCharacterPage(
     items: page.map((r) => ({
       slug: r.slug,
       name: r.name,
-      originalName: r.originalName,
       title: r.title,
       rarity: r.rarity,
       stat1: r.stat1,
@@ -104,6 +103,7 @@ export async function getCharacterPage(
       stat3: r.stat3,
       faction: r.faction,
       kindName: r.kind?.name ?? null,
+      tint: cardTint(r.faction, r.kind),
       isFamily: r.familyId !== null,
       // 목록은 작은 그림(384px)
       imageSrc: heroImageSrc(r, "thumb") ?? characterPictureSrc(r.id, r.familyPictures[0]?.imageUrl, "thumb"),
@@ -183,7 +183,6 @@ export async function getCharacterDetail(
       id: true,
       slug: true,
       name: true,
-      originalName: true,
       title: true,
       aliases: true,
       rarity: true,
@@ -203,7 +202,7 @@ export async function getCharacterDetail(
       creatorId: true,
       familyPictures: { where: { familyId: familyId ?? "-" }, select: { imageUrl: true, strokesUrl: true }, take: 1 },
       creator: { select: { nickname: true } },
-      kind: { select: { name: true } },
+      kind: { select: { name: true, color: true } },
       faction: { select: { name: true, color: true } },
       series: { select: { slug: true, name: true, statLabels: true } },
     },
@@ -214,8 +213,8 @@ export async function getCharacterDetail(
   const relatedSelect = {
     slug: true,
     name: true,
-    originalName: true,
     faction: { select: { color: true } },
+    kind: { select: { color: true } },
   } as const;
 
   const [outgoing, incoming, prev, next] = await Promise.all([
@@ -248,16 +247,14 @@ export async function getCharacterDetail(
     .map((r) => ({
       slug: r.who.slug,
       name: r.who.name,
-      originalName: r.who.originalName,
       label: r.label,
       isRival: RIVAL_TYPES.has(r.type),
-      factionColor: r.who.faction?.color ?? null,
+      factionColor: r.who.faction?.color ?? r.who.kind?.color ?? null,
     }));
 
   return {
     slug: c.slug,
     name: c.name,
-    originalName: c.originalName,
     title: c.title,
     aliases: c.aliases,
     rarity: c.rarity,
@@ -268,6 +265,7 @@ export async function getCharacterDetail(
     funFacts: c.funFacts,
     stats: { stat1: c.stat1, stat2: c.stat2, stat3: c.stat3, stat4: c.stat4, stat5: c.stat5 },
     faction: c.faction,
+    tint: cardTint(c.faction, c.kind),
     isFamily: c.familyId !== null,
     imageSrc: heroImageSrc(c) ?? characterPictureSrc(c.id, picture?.imageUrl),
     imageCover: isPhotoPicture(c.imageUrl ?? picture?.imageUrl),

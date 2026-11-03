@@ -109,7 +109,7 @@ export async function getHeroForWizard(ctx: HeroCtx, heroId: string, d?: Deps) {
           slug: true,
           name: true,
           statLabels: true,
-          kinds: { select: { id: true, name: true }, orderBy: [{ order: "asc" }, { name: "asc" }] },
+          kinds: { select: { id: true, name: true, color: true }, orderBy: [{ order: "asc" }, { name: "asc" }] },
           factions: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
         },
       },
@@ -320,6 +320,7 @@ export async function listMyHeroes(ctx: HeroCtx, d?: Deps) {
       imageUrl: true,
       updatedAt: true,
       faction: { select: { color: true } },
+      kind: { select: { color: true } },
       series: { select: { slug: true, name: true } },
     },
   });
@@ -341,6 +342,7 @@ export async function listFamilyHeroes(familyId: string, d?: Deps) {
       imageUrl: true,
       updatedAt: true,
       faction: { select: { color: true } },
+      kind: { select: { color: true } },
       creator: { select: { nickname: true } },
       series: { select: { slug: true, name: true } },
     },
@@ -381,6 +383,6 @@ export async function getOwnHeroForPicture(ctx: HeroCtx, seriesSlug: string, slu
   const { db } = deps(d);
   return db.character.findFirst({
     where: { slug, familyId: ctx.familyId, creatorId: ctx.profileId, series: { slug: seriesSlug } },
-    select: { id: true, name: true, status: true, imageUrl: true, strokesUrl: true, backgroundUrl: true, faction: { select: { color: true } } },
+    select: { id: true, name: true, status: true, imageUrl: true, strokesUrl: true, backgroundUrl: true, faction: { select: { color: true } }, kind: { select: { color: true } } },
   });
 }

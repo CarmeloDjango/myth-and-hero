@@ -53,7 +53,9 @@ export const worldInputSchema = z
   })
   .refine((w) => new Set(w.statLabels).size === w.statLabels.length, { message: "능력치 이름이 서로 겹쳐요.", path: ["statLabels"] })
   .refine((w) => new Set(w.kinds).size === w.kinds.length, { message: "종류 이름이 서로 겹쳐요.", path: ["kinds"] })
-  .refine((w) => new Set(w.factions.map((f) => f.name)).size === w.factions.length, { message: "편 이름이 서로 겹쳐요.", path: ["factions"] });
+  .refine((w) => new Set(w.factions.map((f) => f.name)).size === w.factions.length, { message: "편 이름이 서로 겹쳐요.", path: ["factions"] })
+  // 종류(어떤 영웅)와 편(누구 편)은 다른 질문이라, 같은 이름이면 아이가 헷갈립니다.
+  .refine((w) => !w.factions.some((f) => w.kinds.includes(f.name)), { message: "편 이름이 종류 이름과 같아요. 다른 이름을 지어 주세요.", path: ["factions"] });
 
 export type WorldInput = z.input<typeof worldInputSchema>;
 

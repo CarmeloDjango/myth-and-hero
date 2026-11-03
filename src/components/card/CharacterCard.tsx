@@ -10,9 +10,9 @@ const FACTION_TEXT: Record<string, string> = {
 };
 
 export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: StatLabels }) {
-  const tint = c.faction?.color ?? "#f7f7f7";
+  const tint = c.tint;
   const factionText = FACTION_TEXT[tint.toLowerCase()] ?? "#4b4b4b";
-  const glyph = cardGlyph(c.name, c.originalName);
+  const glyph = cardGlyph(c.name);
   // 카드에는 능력치 1~3칸을 보여줍니다 (색은 상세 화면과 같은 칸 순서).
   const stats = [
     { label: labels.stat1, value: c.stat1, color: "var(--color-blue)" },
@@ -51,7 +51,7 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
 
       <div className="flex flex-col gap-0.5 px-[18px] pb-1 pt-4">
         <span className="text-[13px] font-bold tracking-[0.053em]" style={{ color: factionText }}>
-          {[c.faction?.name ?? "무소속", c.kindName].filter(Boolean).join(" · ")}
+          {[c.faction?.name, c.kindName].filter(Boolean).join(" · ")}
         </span>
         <h3 className="font-display text-4xl leading-tight">{c.name}</h3>
         {c.title ? <p className="text-[15px] font-medium text-muted">{c.title}</p> : null}

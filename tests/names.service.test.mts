@@ -126,3 +126,12 @@ describe("세계관 이름", () => {
     assert.ok((await worlds.renameWorld(famA.id, w.id, { name: "공룡 나라", description: "쿵쿵" })).ok);
   });
 });
+
+test("세계관: 편 이름이 종류 이름과 같으면 거절", async () => {
+  const r = await worlds.createWorld(
+    { familyId: famA.id, profileId: famA.kid1 },
+    { name: "겹침 나라", description: "", themeColor: "#ff86d0", statLabels: ["힘", "마법", "지혜", "용기", "매력"], kinds: ["영웅", "괴물"], factions: [{ name: "영웅", color: "#ddf4ff" }] },
+  );
+  assert.equal(r.ok, false);
+  assert.match(!r.ok ? r.error : "", /종류 이름과 같아요/);
+});

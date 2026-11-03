@@ -91,7 +91,12 @@ export function WorldWizard() {
 
   const addFaction = () => {
     const v = factionDraft.trim();
+    if (kinds.includes(v)) {
+      setError(`"${v}"은(는) 종류 이름이에요. 편은 다른 이름으로 지어 주세요. (예: ${v} 편, ${v} 나라)`);
+      return;
+    }
     if (!v || factions.some((f) => f.name === v) || factions.length >= FACTIONS_MAX) return;
+    setError(undefined);
     setFactions((list) => [...list, { name: v.slice(0, FACTION_NAME_MAX), color: factionColor }]);
     setFactionDraft("");
     setFactionColor(FACTION_COLORS[(factions.length + 1) % FACTION_COLORS.length]);

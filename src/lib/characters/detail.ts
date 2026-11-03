@@ -62,7 +62,6 @@ export const STAT_COLOR: Record<StatKey, string> = {
 export type RelatedCharacter = {
   slug: string;
   name: string;
-  originalName: string | null;
   label: string;
   isRival: boolean;
   factionColor: string | null;
@@ -71,7 +70,6 @@ export type RelatedCharacter = {
 export type CharacterDetail = {
   slug: string;
   name: string;
-  originalName: string | null;
   title: string | null;
   aliases: string[];
   rarity: number;
@@ -82,6 +80,8 @@ export type CharacterDetail = {
   funFacts: string[];
   stats: Record<StatKey, number>;
   faction: { name: string; color: string | null } | null;
+  /** 카드 배경색: 편 색, 편이 없으면 종류 색 */
+  tint: string;
   /** 아이가 만든 카드("나만의 카드")인지 */
   isFamily: boolean;
   /** 카드 그림 주소: 아이가 만든 영웅의 그림, 또는 공식 인물에 우리 가족이 붙인 그림 (없으면 null) */

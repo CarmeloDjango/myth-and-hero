@@ -91,6 +91,8 @@ model CharacterKind {
   series     Series      @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   name       String
   order      Int         @default(0)
+  /// 카드 배경색 (편이 없는 세계관에서 씀. 편 색이 있으면 편 색이 먼저)
+  color      String?
   characters Character[]
 
   @@unique([seriesId, name])

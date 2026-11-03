@@ -1,3 +1,4 @@
+import { cardTint } from "@/lib/characters/browse";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -72,7 +73,7 @@ async function ParentContent() {
     status: h.status,
     hidden: h.hidden,
     imageSrc: heroImageSrc(h, "thumb"),
-    color: h.faction?.color ?? null,
+    color: cardTint(h.faction, h.kind),
     creator: h.creator?.nickname ?? null,
     seriesSlug: h.series.slug,
     seriesName: h.series.name,

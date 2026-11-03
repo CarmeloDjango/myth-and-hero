@@ -1,3 +1,4 @@
+import { cardTint } from "@/lib/characters/browse";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -46,7 +47,7 @@ async function Picture({ seriesSlug, slug }: { seriesSlug: string; slug: string 
     target = {
       id: official.id,
       name: official.name,
-      color: official.faction?.color ?? null,
+      color: cardTint(official.faction, official.kind),
       saveUrl: `/api/characters/${official.id}/picture`,
       has: !!pic,
       canRemove: !!pic && viewer.parentMode,
@@ -61,7 +62,7 @@ async function Picture({ seriesSlug, slug }: { seriesSlug: string; slug: string 
     target = {
       id: hero.id,
       name: hero.name,
-      color: hero.faction?.color ?? null,
+      color: cardTint(hero.faction, hero.kind),
       saveUrl: `/api/heroes/${hero.id}/drawing`,
       has: !!(hero.strokesUrl || hero.backgroundUrl),
       canRemove: false,
