@@ -11,11 +11,13 @@ import { josa } from "@/lib/text/josa";
 export const HERO_STAT_BUDGET = 300;
 
 /**
- * 아이가 만든 영웅의 별(★) = 카드 배틀 비용(⚡). 능력치 합으로 정합니다.
- * 300(가득) → ★5, 225 → ★4, 150 → ★3, 75 → ★2, 0 → ★1. 예전 영웅(350점)도 ★5.
+ * 별(★) = 능력치 합의 구간 = 카드 배틀 비용(⚡). 공식 인물도 아이가 만든 영웅도 같은 규칙입니다.
+ * ★5 261~300, ★4 221~260, ★3 171~220, ★2 121~170, ★1 120 이하
  */
+export const STAR_BANDS = [261, 221, 171, 121] as const;
 export function heroStars(statSum: number): number {
-  return Math.min(5, Math.max(1, Math.round((statSum / HERO_STAT_BUDGET) * 4) + 1));
+  const i = STAR_BANDS.findIndex((min) => statSum >= min);
+  return i === -1 ? 1 : 5 - i;
 }
 /** 한 칸 최대 점수 */
 export const HERO_STAT_MAX = 100;

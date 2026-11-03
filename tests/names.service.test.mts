@@ -145,6 +145,8 @@ test("영웅 별 = 능력치 합으로 (300 = ★5), 예산 300 넘으면 거절
   assert.ok((await heroes.saveHeroStats(kid, d.heroId, { stat1: 100, stat2: 100, stat3: 100, stat4: 0, stat5: 0 })).ok);
   assert.equal(await rarity(), 5);
   assert.ok((await heroes.saveHeroStats(kid, d.heroId, { stat1: 30, stat2: 30, stat3: 30, stat4: 0, stat5: 0 })).ok);
-  assert.equal(await rarity(), 2, "90점 → ★2");
+  assert.equal(await rarity(), 1, "90점 → ★1");
+  assert.ok((await heroes.saveHeroStats(kid, d.heroId, { stat1: 100, stat2: 100, stat3: 30, stat4: 0, stat5: 0 })).ok);
+  assert.equal(await rarity(), 4, "230점 → ★4");
   assert.equal((await heroes.saveHeroStats(kid, d.heroId, { stat1: 100, stat2: 100, stat3: 100, stat4: 1, stat5: 0 })).ok, false, "301점은 거절");
 });

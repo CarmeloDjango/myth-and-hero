@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 const { familyCardStats, KIND_ABILITY, OFFICIAL_CARDS, RULES, STAT_CAP, statBudget } = await import("../src/lib/battle/cards");
 const { SEED_SERIES } = await import("../prisma/seed-data");
+const { heroStars, HERO_STAT_BUDGET } = await import("../src/lib/heroes/rules");
 const { applyAction, checkAction, legalActions, newBattle } = await import("../src/lib/battle/engine");
 const { buildDeck, nextToriAction } = await import("../src/lib/battle/ai");
 type CardDef = import("../src/lib/battle/cards").CardDef;
@@ -32,6 +33,9 @@ test("공식 카드: 모든 시드 인물이 표에 있고, 힘의 합이 곡선
     assert.equal(attack + health, statBudget(cost, !!KIND_ABILITY[c.kind]), `${c.name} ${cost}/${attack}/${health}`);
     assert.ok(attack >= 1 && health >= 1 && attack <= STAT_CAP && health <= STAT_CAP, c.name);
     assert.equal(c.rarity, cost, `${c.name}: 별(★${c.rarity})과 비용(⚡${cost})이 같아야 함`);
+    const sum = c.stats.reduce((x, y) => x + y, 0);
+    assert.ok(sum <= HERO_STAT_BUDGET && c.stats.every((v) => v >= 5 && v <= 100), `${c.name} 능력치 합 ${sum}`);
+    assert.equal(heroStars(sum), c.rarity, `${c.name}: 능력치 합 ${sum}의 별과 카드 별이 같아야 함`);
   }
   const perCost = [1, 2, 3, 4, 5].map((k) => Object.values(OFFICIAL_CARDS).filter(([cost]) => cost === k).length);
   assert.deepEqual(perCost, [2, 6, 11, 9, 6]);
@@ -208,4 +212,9 @@ test("토리끼리 100판: 항상 규칙대로 하고, 게임이 끝남", () => 
     wins[s.winner]++;
   }
   assert.equal(wins[0] + wins[1], 100);
+});
+
+test("별 구간: ★5 261~300, ★4 221~260, ★3 171~220, ★2 121~170, ★1 120 이하", async () => {
+  const { heroStars } = await import("../src/lib/heroes/rules");
+  assert.deepEqual([300, 261, 260, 221, 220, 171, 170, 121, 120, 0].map(heroStars), [5, 5, 4, 4, 3, 3, 2, 2, 1, 1]);
 });
