@@ -6,6 +6,7 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { STAT_KEYS, toStatLabels } from "@/lib/characters/browse";
 import { getDb } from "@/lib/db";
 import { pictureFiles, readStrokes, writePicture } from "@/lib/drawing/picture";
+import { heroNameConflict } from "@/lib/names";
 import {
   composeStory,
   heroNameSchema,
@@ -130,6 +131,8 @@ export async function saveHeroName(ctx: HeroCtx, heroId: string, input: unknown,
   if (!hero) return fail("내가 만든 영웅이 아니에요.");
   const parsed = heroNameSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "이름을 확인해 주세요.");
+  const conflict = await heroNameConflict(db, { familyId: ctx.familyId, seriesId: hero.seriesId, name: parsed.data.name, exceptId: hero.id });
+  if (conflict) return fail(conflict);
 
   await db.character.update({
     where: { id: hero.id },
@@ -269,10 +272,13 @@ export async function finishHero(ctx: HeroCtx, heroId: string, d?: Deps): Promis
   const { db } = deps(d);
   const hero = await db.character.findFirst({
     where: { id: heroId, familyId: ctx.familyId, creatorId: ctx.profileId },
-    select: { id: true, slug: true, name: true, title: true, summary: true, aliases: true, series: { select: { slug: true } } },
+    select: { id: true, slug: true, name: true, title: true, summary: true, aliases: true, seriesId: true, series: { select: { slug: true } } },
   });
   if (!hero) return fail("내가 만든 영웅이 아니에요.");
   if (!hero.name) return fail("이름을 먼저 정해 주세요.");
+  // 이름을 정한 뒤에 형제가 같은 이름으로 먼저 완성했을 수도 있어서 한 번 더 확인합니다.
+  const conflict = await heroNameConflict(db, { familyId: ctx.familyId, seriesId: hero.seriesId, name: hero.name, exceptId: hero.id });
+  if (conflict) return fail(conflict);
 
   await db.character.update({
     where: { id: hero.id },

@@ -7,6 +7,7 @@ import { STAT_KEYS } from "@/lib/characters/browse";
 import { getDb } from "@/lib/db";
 import { pictureFiles } from "@/lib/drawing/picture";
 import { validateDrawingUpload } from "@/lib/drawing/upload";
+import { worldNameConflict } from "@/lib/names";
 import { strokesSchema, type Stroke } from "@/lib/heroes/rules";
 import { coverStrokesKey, getDrawingStore, worldCoverKeys, type DrawingStore } from "@/lib/storage";
 
@@ -36,6 +37,8 @@ export async function createWorld(ctx: WorldCtx, input: WorldInput, d?: Deps): P
   ]);
   if (!profile) return fail("우리 가족 프로필이 아니에요.");
   if (count >= WORLDS_PER_FAMILY) return fail(`세계관은 ${WORLDS_PER_FAMILY}개까지 만들 수 있어요.`);
+  const conflict = await worldNameConflict(db, { familyId: ctx.familyId, name: w.name });
+  if (conflict) return fail(conflict);
 
   const series = await db.series.create({
     data: {
@@ -137,6 +140,8 @@ export async function renameWorld(familyId: string, seriesId: string, input: unk
   const { db } = deps(d);
   const parsed = worldRenameSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "입력을 확인해 주세요.");
+  const conflict = await worldNameConflict(db, { familyId, name: parsed.data.name, exceptId: seriesId });
+  if (conflict) return fail(conflict);
   const { count } = await db.series.updateMany({
     where: { id: seriesId, familyId },
     data: { name: parsed.data.name, description: parsed.data.description || `${parsed.data.name}에 사는 영웅들` },
@@ -169,4 +174,10 @@ export function worldCoverSrc(world: { id: string; coverImage: string | null }):
   if (!world.coverImage?.startsWith("families/")) return null;
   const version = world.coverImage.split("/").at(-2) ?? "0";
   return `/api/worlds/${world.id}/cover?v=${version}`;
+}
+
+/** 마법사 1단계에서 미리 확인: 겹치는 이름이면 안내 문구 */
+export async function checkWorldName(familyId: string, name: string, d?: Deps): Promise<string | null> {
+  const { db } = deps(d);
+  return name.trim() ? worldNameConflict(db, { familyId, name }) : null;
 }

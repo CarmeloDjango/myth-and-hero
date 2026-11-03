@@ -20,6 +20,13 @@ export async function createWorldAction(input: WorldInput): Promise<{ ok: true; 
   return result;
 }
 
+/** 세계관 이름이 이미 있는지 (마법사 1단계 "다음"에서) */
+export async function checkWorldNameAction(name: string): Promise<string | null> {
+  const viewer = await getFamilyViewerOrNull();
+  if (!viewer) return null;
+  return worlds.checkWorldName(viewer.family.id, String(name).slice(0, 40));
+}
+
 async function parentFamilyId(): Promise<string | null> {
   const viewer = await getFamilyViewerOrNull();
   return viewer?.parentMode ? viewer.family.id : null;
