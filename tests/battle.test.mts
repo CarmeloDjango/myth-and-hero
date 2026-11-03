@@ -31,13 +31,16 @@ test("공식 카드: 모든 시드 인물이 표에 있고, 힘의 합이 곡선
     const [cost, attack, health] = card;
     assert.equal(attack + health, statBudget(cost, !!KIND_ABILITY[c.kind]), `${c.name} ${cost}/${attack}/${health}`);
     assert.ok(attack >= 1 && health >= 1 && attack <= STAT_CAP && health <= STAT_CAP, c.name);
+    assert.equal(c.rarity, cost, `${c.name}: 별(★${c.rarity})과 비용(⚡${cost})이 같아야 함`);
   }
   const perCost = [1, 2, 3, 4, 5].map((k) => Object.values(OFFICIAL_CARDS).filter(([cost]) => cost === k).length);
   assert.deepEqual(perCost, [2, 6, 11, 9, 6]);
 });
 
 test("아이 영웅 카드: 능력치 합으로 비용, 곡선·한도 지킴", () => {
-  assert.equal(familyCardStats([100, 100, 100, 50, 0], false).cost, 5, "350점 가득");
+  assert.equal(familyCardStats([100, 100, 100, 0, 0], false).cost, 5, "300점 가득");
+  assert.equal(familyCardStats([100, 100, 100, 50, 0], false).cost, 5, "예전 350점 영웅도 5");
+  assert.equal(familyCardStats([45, 45, 45, 45, 45], false).cost, 4, "225점");
   assert.equal(familyCardStats([50, 50, 50, 50, 50], false).cost, 4, "250점");
   assert.equal(familyCardStats([10, 0, 0, 0, 0], false).cost, 1);
   for (const stats of [[100, 100, 100, 50, 0], [70, 70, 70, 70, 70], [100, 0, 0, 0, 0], [0, 0, 0, 0, 0]]) {

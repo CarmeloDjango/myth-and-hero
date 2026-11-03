@@ -10,6 +10,7 @@ import { heroNameConflict } from "@/lib/names";
 import {
   composeStory,
   heroNameSchema,
+  heroStars,
   heroStatsSchema,
   stepIndex,
   storyAnswersSchema,
@@ -68,7 +69,7 @@ export async function createHeroDraft(ctx: HeroCtx, seriesSlug: string, d?: Deps
       status: "DRAFT",
       wizardStep: stepIndex("name"),
       published: true,
-      rarity: 5, // 나만의 카드는 언제나 5성
+      rarity: 1, // 별은 능력치를 정하면 다시 계산 (heroStars)
       name: "",
       searchText: "",
       choseong: "",
@@ -243,9 +244,11 @@ export async function saveHeroStats(ctx: HeroCtx, heroId: string, input: unknown
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "능력치를 확인해 주세요.");
 
   const stats = Object.fromEntries(STAT_KEYS.map((k) => [k, Number(parsed.data[k])]));
+  const sum = STAT_KEYS.reduce((t, k) => t + Number(parsed.data[k]), 0);
   await db.character.update({
     where: { id: hero.id },
-    data: { ...stats, wizardStep: advance(hero.wizardStep, "stats") },
+    // 별 = 카드 배틀 비용: 능력치 합으로
+    data: { ...stats, rarity: heroStars(sum), wizardStep: advance(hero.wizardStep, "stats") },
   });
   return { ok: true };
 }
