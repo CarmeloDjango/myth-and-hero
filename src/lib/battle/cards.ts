@@ -131,7 +131,8 @@ export function cardStatsFor(c: { slug: string; official: boolean; stats: number
  */
 export const RULES = {
   leaderHp: 18,
-  startEnergy: 1,
+  /** 첫 차례 에너지 (1이면 1코스트 카드가 없을 때 첫 차례에 할 게 없음) */
+  startEnergy: 2,
   maxEnergy: 6,
   /** 나중에 하는 쪽 첫 차례 에너지 보너스 (먼저 하는 쪽이 너무 유리해서) */
   secondBonus: 1,

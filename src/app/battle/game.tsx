@@ -40,6 +40,23 @@ export function Game({
   const [covered, setCovered] = useState(duo);
   const fxId = useRef(0);
   const reported = useRef(false);
+  // "차례 끝" 확인 창 (할 수 있는 게 남았을 때)
+  const [confirmEnd, setConfirmEnd] = useState<string | null>(null);
+  // 이번 차례에 카드를 냈는지 (차례 번호)
+  const [playedTurn, setPlayedTurn] = useState(0);
+  // 첫 판 손가락 안내: 아이마다 첫 판이 끝날 때까지 (이 기기에 기억)
+  const [learners] = useState<Set<string>>(() => {
+    const out = new Set<string>();
+    for (const seat of seats) {
+      if (seat.kind !== "kid") continue;
+      try {
+        if (!localStorage.getItem(tutorialKey(seat.profile.id))) out.add(seat.profile.id);
+      } catch {
+        /* 저장소를 못 쓰면 안내 없이 */
+      }
+    }
+    return out;
+  });
 
   const isTori = (side: Side) => seats[side].kind === "tori";
   const bottom: Side = duo ? s.turn : seats[0].kind === "tori" ? 1 : 0;
@@ -59,6 +76,7 @@ export function Game({
     const next = applyAction(s, a);
     commit(next);
     setNotice(undefined);
+    if (a.type === "play") setPlayedTurn(s.turnNo);
     if (a.type === "end" && duo && next.winner === null) setCovered(true);
   };
 
@@ -75,8 +93,17 @@ export function Game({
   useEffect(() => {
     if (s.winner === null || reported.current) return;
     reported.current = true;
+    // 한 판을 끝까지 했으면 다음부터는 손가락 안내 없이
+    for (const seat of seats) {
+      if (seat.kind !== "kid") continue;
+      try {
+        localStorage.setItem(tutorialKey(seat.profile.id), "1");
+      } catch {
+        /* 무시 */
+      }
+    }
     onFinished(s);
-  }, [s, onFinished]);
+  }, [s, onFinished, seats]);
 
   if (covered && s.winner === null) {
     const who = seats[s.turn];
@@ -95,7 +122,45 @@ export function Game({
   const foe = s.players[top];
   const myTurn = s.turn === bottom && s.winner === null && !isTori(bottom);
   const canTarget = (target: string) => myTurn && selected !== null && !checkAction(s, { type: "attack", attacker: selected, target });
-  const onlyEnd = myTurn && legalActions(s).length === 1;
+  const legal = myTurn ? legalActions(s) : [];
+  const onlyEnd = myTurn && legal.length === 1;
+  const playableIndex = legal.find((a): a is Extract<Action, { type: "play" }> => a.type === "play")?.handIndex ?? null;
+  const canAttack = legal.some((a) => a.type === "attack");
+  const readyUid = me.board.find((u) => legal.some((a) => a.type === "attack" && a.attacker === u.uid))?.uid ?? null;
+
+  /** "차례 끝": 카드를 하나도 안 냈는데 낼 수 있거나, 아직 공격할 수 있으면 한 번 물어봅니다. */
+  const tryEnd = () => {
+    const unplayed = playableIndex !== null && playedTurn !== s.turnNo;
+    if (unplayed || canAttack) {
+      setConfirmEnd(
+        unplayed && canAttack
+          ? "아직 낼 수 있는 카드도, 공격할 수 있는 카드도 있어요!"
+          : unplayed
+            ? "아직 낼 수 있는 카드가 있어요! (초록색 카드)"
+            : "아직 공격할 수 있는 카드가 있어요! (필드의 초록색 카드)",
+      );
+      return;
+    }
+    setSelected(null);
+    act({ type: "end" });
+  };
+
+  // 첫 판 손가락 안내: 지금 무엇을 누르면 되는지 하나만 가리킵니다.
+  const learning = myTurn && seats[bottom].kind === "kid" && learners.has((seats[bottom] as Extract<Seat, { kind: "kid" }>).profile.id);
+  const hint: { kind: "hand"; index: number } | { kind: "unit"; uid: string } | { kind: "target"; uid: string | "leader" } | { kind: "end" } | null = !learning
+    ? null
+    : selected
+      ? canTarget("leader")
+        ? { kind: "target", uid: "leader" }
+        : (() => {
+            const t = foe.board.find((u) => canTarget(u.uid));
+            return t ? { kind: "target" as const, uid: t.uid } : null;
+          })()
+      : playableIndex !== null
+        ? { kind: "hand", index: playableIndex }
+        : readyUid
+          ? { kind: "unit", uid: readyUid }
+          : { kind: "end" };
 
   const crisisNow = fx.events.some((e) => e.type === "crisis" && e.side === s.turn);
   const bonusNow = !crisisNow && s.players[s.turn].energy > s.players[s.turn].maxEnergy;
@@ -110,8 +175,10 @@ export function Game({
           ? "나중에 시작해서 에너지를 1 더 받았어요 ⚡"
           : selected
             ? "누구를 공격할까요? 반짝이는 곳을 눌러요."
-            : onlyEnd
-              ? "할 수 있는 게 다 끝났어요. '차례 끝'을 눌러요."
+            : onlyEnd && me.hand.length > 0 && me.energy === me.maxEnergy && !me.board.length
+              ? `지금 에너지 ⚡${me.energy}개로 낼 수 있는 카드가 없어요. 에너지는 차례마다 1개씩 늘어나요! '차례 끝'을 눌러요.`
+              : onlyEnd
+                ? "할 수 있는 게 다 끝났어요. '차례 끝'을 눌러요."
               : "카드를 눌러서 내고, 필드의 내 카드를 눌러 공격해요."));
 
   const damageOn = (side: Side, target: string) =>
@@ -125,6 +192,7 @@ export function Game({
         isTurn={s.turn === top}
         hidden
         targetable={canTarget("leader")}
+        pointer={hint?.kind === "target" && hint.uid === "leader"}
         onTarget={() => selected && act({ type: "attack", attacker: selected, target: "leader" })}
         hits={damageOn(top, "leader")}
         fxId={fx.id}
@@ -135,6 +203,7 @@ export function Game({
         fxId={fx.id}
         damageOn={(uid) => damageOn(top, uid)}
         isTarget={(uid) => canTarget(uid)}
+        pointerUid={hint?.kind === "target" && hint.uid !== "leader" ? hint.uid : null}
         onTap={(u) => (selected ? act({ type: "attack", attacker: selected, target: u.uid }) : setNotice("내 카드를 먼저 골라요."))}
       />
 
@@ -150,6 +219,7 @@ export function Game({
         damageOn={(uid) => damageOn(bottom, uid)}
         isSelected={(uid) => selected === uid}
         isReady={(u) => myTurn && u.ready}
+        pointerUid={hint?.kind === "unit" ? hint.uid : null}
         onTap={(u) => {
           if (!myTurn) return;
           if (!u.ready) {
@@ -164,15 +234,13 @@ export function Game({
         <button
           type="button"
           disabled={!myTurn}
-          onClick={() => {
-            setSelected(null);
-            act({ type: "end" });
-          }}
-          className={`pressable inline-flex min-h-14 items-center rounded-button border-b-4 px-5 text-lg font-bold disabled:opacity-40 ${
+          onClick={tryEnd}
+          className={`pressable relative inline-flex min-h-14 items-center rounded-button border-b-4 px-5 text-lg font-bold disabled:opacity-40 ${
             onlyEnd ? "animate-pulse border-green-dark bg-green text-paper" : "border-line bg-paper text-blue-ink"
           }`}
         >
           차례 끝 →
+          {hint?.kind === "end" ? <Pointer /> : null}
         </button>
       </PlayerBar>
 
@@ -188,9 +256,10 @@ export function Game({
                 setSelected(null);
                 act({ type: "play", handIndex: i });
               }}
-              className={`battle-anim shrink-0 rounded-[18px] p-0.5 transition-transform [animation:card-in_.35s_ease-out] ${playable ? "-translate-y-1 bg-green" : ""}`}
+              className={`battle-anim relative shrink-0 rounded-[18px] p-0.5 transition-transform [animation:card-in_.35s_ease-out] ${playable ? "-translate-y-1 bg-green" : ""}`}
             >
               <BattleCard card={c} dim={myTurn && !playable} />
+              {hint?.kind === "hand" && hint.index === i ? <Pointer label="눌러서 내요" /> : null}
             </button>
           );
         })}
@@ -199,6 +268,36 @@ export function Game({
       <p className="text-center text-[13px] font-bold text-muted">
         남은 덱 {me.deck.length}장 · 필드 {me.board.length}/{BOARD_MAX}
       </p>
+
+      {confirmEnd ? (
+        <div role="dialog" aria-modal="true" aria-label="차례를 끝낼까요?" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
+          <div className="flex w-full max-w-[420px] flex-col items-center gap-4 rounded-card bg-paper p-6 text-center [animation:pop_.35s_ease-out]">
+            <Tori size={96} mood="wow" />
+            <p className="text-2xl font-bold leading-snug">{confirmEnd}</p>
+            <p className="font-medium text-muted">그래도 차례를 끝낼까요?</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmEnd(null)}
+                className="pressable min-h-14 rounded-button border-b-4 border-green-dark bg-green px-6 text-lg font-bold text-paper"
+              >
+                {confirmEnd.includes("낼 수 있는") ? "카드 낼래요" : "공격할래요"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmEnd(null);
+                  setSelected(null);
+                  act({ type: "end" });
+                }}
+                className="sticker pressable min-h-14 rounded-button px-5 font-bold text-muted"
+              >
+                그래도 끝낼래요
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {s.winner !== null ? <EndDialog seats={seats} winner={s.winner} onAgain={onAgain} onMenu={onMenu} /> : null}
     </div>
@@ -231,6 +330,7 @@ function PlayerBar({
   isTurn,
   hidden = false,
   targetable = false,
+  pointer = false,
   onTarget,
   hits,
   fxId,
@@ -242,6 +342,8 @@ function PlayerBar({
   /** 손패를 뒤집어 보여줌 (위쪽 상대) */
   hidden?: boolean;
   targetable?: boolean;
+  /** 첫 판 손가락 안내 */
+  pointer?: boolean;
   onTarget?: () => void;
   hits: { amount: number }[];
   fxId: number;
@@ -274,8 +376,9 @@ function PlayerBar({
   return (
     <div className={`flex flex-wrap items-center gap-3 rounded-card border-2 p-2.5 ${isTurn ? "border-green bg-green-soft" : "border-line bg-paper"}`}>
       {targetable ? (
-        <button type="button" onClick={onTarget} aria-label={`${l.name} 대장 공격하기`} className="rounded-full">
+        <button type="button" onClick={onTarget} aria-label={`${l.name} 대장 공격하기`} className="relative rounded-full">
           {avatar}
+          {pointer ? <Pointer label="대장을 공격해요" /> : null}
         </button>
       ) : (
         avatar
@@ -285,7 +388,8 @@ function PlayerBar({
           {seat.kind === "kid" ? <ProfileAvatar nickname={seat.profile.nickname} avatar={seat.profile.avatar} size={24} /> : null}
           {seat.kind === "tori" ? "토리" : `${seat.profile.nickname} · 대장 ${l.name}`}
         </span>
-        <span className="flex items-center gap-1 font-black" aria-label={`체력 ${l.hp}`}>
+        <span className="flex items-center gap-1 font-black" aria-label={`대장 체력 ${l.hp}`}>
+          <span aria-hidden="true" className="text-sm font-bold text-muted">대장 체력</span>
           <span aria-hidden="true">❤️</span>
           <span className={l.hp <= 5 ? "text-[#b42318]" : ""}>{Math.max(0, l.hp)}</span>
           <span className="text-sm font-bold text-muted">/ {l.maxHp}</span>
@@ -306,10 +410,16 @@ function PlayerBar({
         ))}
       </div>
       {hidden ? (
-        <div className="ml-auto flex gap-1" aria-label={`${seatName(seat)} 손패 ${player.hand.length}장`}>
-          {player.hand.map((_, i) => (
-            <CardBack key={i} />
-          ))}
+        <div className="ml-auto flex flex-col items-end gap-1" aria-label={`${seatName(seat)} 손패 ${player.hand.length}장`}>
+          <div className="flex gap-1">
+            {player.hand.map((_, i) => (
+              <CardBack key={i} />
+            ))}
+          </div>
+          {/* 뒤집힌 카드가 무엇인지 글로도 알려 줌 (상대가 손에 든 카드, 앞면은 안 보임) */}
+          <span aria-hidden="true" className="text-[13px] font-bold text-muted">
+            손에 든 카드 {player.hand.length}장
+          </span>
         </div>
       ) : (
         <div className="ml-auto">{children}</div>
@@ -328,6 +438,7 @@ function Board({
   isTarget = () => false,
   isSelected = () => false,
   isReady = () => false,
+  pointerUid = null,
 }: {
   label: string;
   empty?: string;
@@ -338,6 +449,8 @@ function Board({
   isTarget?: (uid: string) => boolean;
   isSelected?: (uid: string) => boolean;
   isReady?: (u: Unit) => boolean;
+  /** 첫 판 손가락 안내를 띄울 카드 */
+  pointerUid?: string | null;
 }) {
   return (
     <div className="flex min-h-[196px] items-center justify-center gap-2 rounded-card border-2 border-dashed border-line px-2 py-2" aria-label={label}>
@@ -361,6 +474,7 @@ function Board({
             <span key={hits.length ? `hit-${fxId}` : "still"} className={`battle-anim block ${hits.length ? "[animation:hit-shake_.4s]" : ""}`}>
               <BattleCard card={u.card} attack={u.attack} health={u.health} maxHealth={u.maxHealth} showCost={false} />
             </span>
+            {pointerUid === u.uid ? <Pointer label={target ? "눌러서 공격해요" : "공격할 카드로 골라요"} /> : null}
             {hits.map((h, i) => (
               <span key={`${fxId}-${i}`} className="battle-anim pointer-events-none absolute left-1/2 top-6 z-10 font-display text-4xl text-[#b42318] [animation:float-up_.9s_ease-out_forwards]">
                 -{h.amount}
@@ -395,5 +509,17 @@ function EndDialog({ seats, winner, onAgain, onMenu }: { seats: [Seat, Seat]; wi
         </div>
       </div>
     </div>
+  );
+}
+
+const tutorialKey = (profileId: string) => `battle-tutorial-done:${profileId}`;
+
+/** 첫 판 손가락 안내 👆 (통통 튀며 가리킴) */
+function Pointer({ label }: { label?: string }) {
+  return (
+    <span aria-hidden="true" data-hint className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 flex-col items-center">
+      <span className="battle-anim text-5xl drop-shadow-md [animation:tap-hint_1s_ease-in-out_infinite]">👆</span>
+      {label ? <span className="whitespace-nowrap rounded-button bg-ink px-2 py-0.5 text-[13px] font-bold text-paper">{label}</span> : null}
+    </span>
   );
 }

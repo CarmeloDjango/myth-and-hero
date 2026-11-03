@@ -52,7 +52,7 @@ test("아이 영웅 카드: 능력치 합으로 비용, 곡선·한도 지킴", 
   assert.ok(spiky.attack > even.attack, "한 가지만 높으면 공격 쪽");
 });
 
-test("시작: 먼저 3장+1장, 나중 4장, 첫 차례 에너지 1, 나중 쪽은 첫 차례 보너스", () => {
+test("시작: 먼저 3장+1장, 나중 4장, 첫 차례 에너지 2, 나중 쪽은 첫 차례 보너스", () => {
   const deck = Array.from({ length: 10 }, () => card(1, 1, 1));
   const s = newBattle(setup("나", deck), setup("토리", deck), 42);
   assert.equal(s.turn, 0);
@@ -66,6 +66,16 @@ test("시작: 먼저 3장+1장, 나중 4장, 첫 차례 에너지 1, 나중 쪽�
   assert.equal(u.players[1].energy, u.players[1].maxEnergy, "보너스는 한 번만");
   // 같은 seed면 같은 손패
   assert.deepEqual(newBattle(setup("나", deck), setup("토리", deck), 42).players[0].hand.map((c) => c.id), s.players[0].hand.map((c) => c.id));
+});
+
+test("첫 손패에는 첫 차례에 낼 수 있는 카드가 꼭 있음 (덱에 있다면)", () => {
+  // 비싼 카드 9장 + 싼 카드 1장(맨 뒤로 섞일 수도 있음)
+  for (let seed = 1; seed <= 200; seed++) {
+    const deck = [...Array.from({ length: 9 }, () => card(5, 5, 5)), card(1, 1, 1, null, "싼카드")];
+    const s = newBattle(setup("나", deck), setup("토리", deck), seed, 0);
+    assert.ok(s.players[0].hand.some((c) => c.cost <= s.players[0].energy), `seed ${seed} 먼저`);
+    assert.ok(s.players[1].hand.some((c) => c.name === "싼카드"), `seed ${seed} 나중`);
+  }
 });
 
 test("에너지는 차례마다 1씩 늘어 최대 6", () => {
