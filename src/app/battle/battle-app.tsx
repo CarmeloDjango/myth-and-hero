@@ -10,10 +10,11 @@ import { ReadAloudButton } from "@/components/speech/ReadAloudButton";
 import { buildDeck } from "@/lib/battle/ai";
 import { DECK_SIZE, type CardDef } from "@/lib/battle/cards";
 import { newBattle, type BattleState, type Side } from "@/lib/battle/engine";
+import { TROPHIES } from "@/lib/battle/trophies";
 
 import { Game } from "./game";
 import { PlayerSetup } from "./setup";
-import { seatName, type Loadout, type Profile, type Seat, type StatsView } from "./types";
+import { seatName, TORI_LEVELS, type FinishFacts, type Loadout, type Profile, type Seat, type StatsView, type TrophiesEarned } from "./types";
 
 const RULES =
   "카드를 눌러서 필드에 내요. 카드를 내려면 번개 숫자만큼 에너지가 필요해요. 필드에 있는 내 카드를 누르고, 상대 카드나 대장을 눌러서 공격해요. 상대 대장의 체력을 0으로 만들면 이겨요!";
@@ -51,17 +52,29 @@ export function BattleApp({ pool, me, profiles, stats }: { pool: CardDef[]; me: 
   };
 
   const record = useCallback(
-    (seats: [Seat, Seat], loadouts: [Loadout, Loadout]) => (s: BattleState) => {
-      if (s.winner === null || seats[0].kind !== "kid") return;
-      void recordBattleAction({
-        p1Id: seats[0].profile.id,
-        p2Id: seats[1].kind === "kid" ? seats[1].profile.id : null,
-        winner: s.winner + 1,
-        p1Leader: loadouts[0].leader.name,
-        p2Leader: loadouts[1].leader.name,
-        turns: s.turnNo,
-      }).catch(() => {});
-    },
+    (seats: [Seat, Seat], loadouts: [Loadout, Loadout]) =>
+      async (s: BattleState, facts: FinishFacts): Promise<TrophiesEarned> => {
+        if (s.winner === null || seats[0].kind !== "kid") return [];
+        const tori = seats[1].kind === "tori" ? seats[1] : null;
+        try {
+          const res = await recordBattleAction({
+            p1Id: seats[0].profile.id,
+            p2Id: seats[1].kind === "kid" ? seats[1].profile.id : null,
+            winner: s.winner + 1,
+            p1Leader: loadouts[0].leader.name,
+            p2Leader: loadouts[1].leader.name,
+            turns: s.turnNo,
+            toriLevel: tori ? tori.level : null,
+            finish: facts.finish,
+            winnerHp: Math.max(0, facts.winnerHp),
+            p1Hero: facts.heroPlayed[0],
+            p2Hero: facts.heroPlayed[1],
+          });
+          return (res.earned ?? []).filter((e) => e.trophies.length);
+        } catch {
+          return []; // 저장이 안 돼도 게임은 그대로
+        }
+      },
     [],
   );
 
@@ -134,17 +147,32 @@ export function BattleApp({ pool, me, profiles, stats }: { pool: CardDef[]; me: 
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => setPhase({ k: "setup", seats: [mySeat, { kind: "tori" }], first: null, handoff: false })}
-          className="sticker pressable flex items-center gap-4 rounded-card bg-[#f3e1ff] p-5 text-left transition-transform hover:-translate-y-1"
-        >
-          <Tori size={72} />
-          <span className="flex flex-col">
-            <span className="font-display text-3xl text-[#7a3fb0]">토리와 대결</span>
-            <span className="font-medium text-ink">혼자서도 할 수 있어요</span>
-          </span>
-        </button>
+        <div className="sticker flex flex-col gap-3 rounded-card bg-[#f3e1ff] p-5">
+          <div className="flex items-center gap-4">
+            <Tori size={72} />
+            <span className="flex flex-col">
+              <span className="font-display text-3xl text-[#7a3fb0]">토리와 대결</span>
+              <span className="font-medium text-ink">혼자서도 할 수 있어요</span>
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="토리 난이도">
+            {TORI_LEVELS.map((t) => (
+              <button
+                key={t.level}
+                type="button"
+                onClick={() => setPhase({ k: "setup", seats: [mySeat, { kind: "tori", level: t.level }], first: null, handoff: false })}
+                className={`pressable flex min-h-16 flex-col items-center justify-center rounded-button border-b-4 px-2 py-1.5 font-bold text-paper ${
+                  t.level === "normal" ? "border-[#5a2a85] bg-[#7a3fb0]" : "border-[#7a3fb0] bg-purple"
+                }`}
+              >
+                <span className="text-xl">
+                  {t.icon} {t.label}
+                </span>
+                <span className="text-[13px] font-medium opacity-90">{t.text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         {siblings.map((sib) => (
           <button
             key={sib.id}
@@ -164,6 +192,7 @@ export function BattleApp({ pool, me, profiles, stats }: { pool: CardDef[]; me: 
         ))}
       </div>
 
+      <TrophyShelf stats={stats} meId={me.id} />
       <StatsPanel stats={stats} />
     </div>
   );
@@ -189,6 +218,11 @@ function StatsPanel({ stats }: { stats: StatsView }) {
                   <span className="text-[15px] font-bold text-muted">
                     토리와 {p.vsTori.wins}승 {p.vsTori.losses}패
                   </span>
+                  {p.vsNormal.wins + p.vsNormal.losses ? (
+                    <span className="text-[14px] font-bold text-[#7a3fb0]">
+                      (그중 보통 토리 {p.vsNormal.wins}승 {p.vsNormal.losses}패)
+                    </span>
+                  ) : null}
                   {p.vsFamily.map((f) => (
                     <span key={f.opponentId} className="text-[15px] font-bold text-muted">
                       {f.nickname}와 {f.wins}승 {f.losses}패
@@ -209,6 +243,58 @@ function StatsPanel({ stats }: { stats: StatsView }) {
           ) : null}
         </>
       )}
+    </section>
+  );
+}
+
+/** 트로피 진열장: 내 것은 모두(못 받은 것은 흐리게 + 받는 방법), 형제는 개수와 아이콘만 */
+function TrophyShelf({ stats, meId }: { stats: StatsView; meId: string }) {
+  const mine = stats.players.find((p) => p.id === meId);
+  if (!mine) return null;
+  const got = new Set(mine.trophies);
+  const others = stats.players.filter((p) => p.id !== meId);
+  return (
+    <section aria-labelledby="battle-trophies" className="flex flex-col gap-3">
+      <h2 id="battle-trophies" className="flex items-baseline gap-2 text-2xl font-bold">
+        트로피
+        <span className="text-lg text-muted">
+          {got.size} / {TROPHIES.length}
+        </span>
+      </h2>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {TROPHIES.map((t) => {
+          const have = got.has(t.id);
+          return (
+            <li
+              key={t.id}
+              aria-label={`${t.name}${have ? " (받았어요)" : " (아직)"}: ${t.hint}`}
+              className={`flex items-center gap-2 rounded-card p-3 ${have ? "sticker bg-[#fff4c2]" : "bg-paper-dim"}`}
+            >
+              <span aria-hidden="true" className={`text-3xl ${have ? "" : "opacity-30 grayscale"}`}>
+                {have ? t.icon : "🔒"}
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <b className={`leading-tight ${have ? "" : "text-muted"}`}>{t.name}</b>
+                <span className="text-[13px] font-medium leading-snug text-muted">{t.hint}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {others.length ? (
+        <ul className="flex flex-wrap gap-2" aria-label="가족 트로피">
+          {others.map((p) => (
+            <li key={p.id} className="flex items-center gap-2 rounded-button bg-paper-dim px-3 py-1.5">
+              <ProfileAvatar nickname={p.nickname} avatar={p.avatar} size={32} />
+              <b>{p.nickname}</b>
+              <span className="font-bold text-muted">
+                🏆 {p.trophies.length}/{TROPHIES.length}
+              </span>
+              <span aria-hidden="true">{TROPHIES.filter((t) => p.trophies.includes(t.id)).map((t) => t.icon).join("")}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

@@ -268,6 +268,15 @@ model BattleRecord {
   p2Leader  String
   /// 두 사람 차례 수 합
   turns     Int
+  /// 토리 난이도 ("easy" | "normal", 둘이 대결이면 null)
+  toriLevel String?
+  /// 마지막 한 방 ("attack" | "fire" | "fatigue", 예전 기록은 null)
+  finish    String?
+  /// 이긴 쪽 대장의 남은 체력 (예전 기록은 null)
+  winnerHp  Int?
+  /// 자기가 만든 영웅 카드를 냈는지
+  p1Hero    Boolean       @default(false)
+  p2Hero    Boolean       @default(false)
   createdAt DateTime      @default(now())
 
   @@index([familyId, createdAt])
