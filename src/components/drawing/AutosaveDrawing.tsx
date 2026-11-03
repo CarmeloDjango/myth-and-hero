@@ -4,9 +4,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { DrawingCanvas, type DrawingCanvasHandle } from "@/components/drawing/DrawingCanvas";
 import { PhotoCropper } from "@/components/drawing/PhotoCropper";
+import { clearBackup, readBackup, writeBackup } from "@/lib/drawing/perf";
 import type { Stroke } from "@/lib/heroes/rules";
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
+
+/** 그리다 멈추고 이만큼 지나면 저장 (저장하는 동안 아이패드가 잠깐 멈칫해서, 너무 자주 하지 않음) */
+const SAVE_DELAY = 2500;
 
 /** 사진 파일·주소 → 다 불러온 이미지 (아이폰 HEIC도 브라우저가 읽음) */
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -20,7 +24,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /**
  * 그리기 + 자동 저장 (영웅 그림, 세계관 표지, 공식 인물 그림 공용)
- * - 그리다 멈추고 1.5초 뒤 그림과 그리기 기록을 saveUrl로 올립니다 (multipart, src/lib/drawing/http.ts).
+ * - 그리다 멈추고 2.5초 뒤 그림과 그리기 기록을 saveUrl로 올립니다 (multipart, src/lib/drawing/http.ts).
+ *   선을 긋는 중에는 미룹니다.
+ * - 아직 못 올린 기록은 이 기기(localStorage)에도 맡겨 두고, 다시 열면 되살려서 올립니다
+ *   (Safari가 메모리 때문에 페이지를 새로 열어도 그린 것이 사라지지 않게).
  * - hasDrawing이면 saveUrl?strokes=1에서 저장된 기록(과 밑그림 사진 주소)을 불러와 이어 그립니다.
  * - allowPhoto면 "사진 올리기"로 밑그림 사진을 깔고 그 위에 덧그릴 수 있습니다.
  *   올린 사진은 "사진 맞추기"에서 정사각형으로 자릅니다 (자동 맞춤, 끌기, 크기).
@@ -48,8 +55,12 @@ export function AutosaveDrawing({
   /** 아직 안 올린 밑그림 변경: 새 사진, 또는 "clear"(사진 빼기) */
   const pendingBg = useRef<Blob | "clear" | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inflight = useRef<Promise<boolean> | null>(null);
-  const [initial, setInitial] = useState<Stroke[] | null>(hasDrawing ? null : []);
+  // 처음 그림: 이 기기에 맡겨 둔(못 올린) 기록이 있으면 그것, 없으면 서버 기록
+  const [initial, setInitial] = useState<Stroke[] | null>(null);
+  /** 맡겨 둔 기록을 되살렸는지 (되살렸으면 곧 올림) */
+  const [restored, setRestored] = useState(false);
   const [underlay, setUnderlay] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>("idle");
   const [photoError, setPhotoError] = useState<string>();
@@ -58,17 +69,32 @@ export function AutosaveDrawing({
   const [cropping, setCropping] = useState<{ img: HTMLImageElement; temp: string | null } | null>(null);
 
   useEffect(() => {
-    if (!hasDrawing) return;
     let alive = true;
+    const applyStrokes = (server: Stroke[]) => {
+      const backup = readBackup(saveUrl);
+      const strokes = backup ?? server;
+      current.current = strokes;
+      if (backup) {
+        latest.current = backup;
+        setRestored(true);
+      }
+      setInitial(strokes);
+    };
+    if (!hasDrawing) {
+      // 새 그림: 기다릴 것이 없지만, 맡겨 둔 기록은 확인 (effect 안에서 상태를 바꾸지 않게 다음 틱에)
+      queueMicrotask(() => alive && applyStrokes([]));
+      return () => {
+        alive = false;
+      };
+    }
     fetch(`${saveUrl}?strokes=1`)
       .then((r) => (r.ok ? r.json() : { strokes: [] }))
       .then((d: { strokes: Stroke[]; background?: string | null }) => {
         if (!alive) return;
-        current.current = d.strokes;
         setUnderlay(d.background ?? null);
-        setInitial(d.strokes);
+        applyStrokes(d.strokes);
       })
-      .catch(() => alive && setInitial([]));
+      .catch(() => alive && applyStrokes([]));
     return () => {
       alive = false;
     };
@@ -102,7 +128,11 @@ export function AutosaveDrawing({
       const res = await fetch(saveUrl, { method: "POST", body, signal: AbortSignal.timeout(30_000) });
       const data = (await res.json().catch(() => ({ ok: false, error: `서버 응답 ${res.status}` }))) as { ok: boolean; error?: string };
       if (!data.ok) throw new Error(data.error ?? "저장하지 못했어요.");
-      if (latest.current === strokes) latest.current = null;
+      if (latest.current === strokes) {
+        latest.current = null;
+        if (backupTimer.current) clearTimeout(backupTimer.current);
+        clearBackup(saveUrl);
+      }
       if (pendingBg.current === bg) pendingBg.current = null;
       setSave(latest.current ? "dirty" : "saved");
       return true;
@@ -126,15 +156,30 @@ export function AutosaveDrawing({
     }
   };
 
-  const schedule = () => {
+  const schedule = (delay = SAVE_DELAY) => {
     setSave("dirty");
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => void flush(), 1500);
+    timer.current = setTimeout(() => {
+      // 선을 긋는 중이면 조금 뒤에 다시
+      if (canvas.current?.busy()) schedule(1000);
+      else void flush();
+    }, delay);
   };
+
+  // 되살린 기록은 그림판이 준비되면 바로 올립니다.
+  useEffect(() => {
+    if (restored && initial) schedule(800);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 되살렸을 때 한 번
+  }, [restored, initial]);
 
   const onChange = (strokes: Stroke[]) => {
     current.current = strokes;
     latest.current = strokes;
+    // 이 기기에 맡겨 두기 (조금 모아서)
+    if (backupTimer.current) clearTimeout(backupTimer.current);
+    backupTimer.current = setTimeout(() => {
+      if (latest.current) writeBackup(saveUrl, latest.current);
+    }, 400);
     schedule();
   };
 

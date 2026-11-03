@@ -3,6 +3,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import { composeWithUnderlay, context2d, mirrorOp, renderAll, renderOp, scratchCanvas } from "@/lib/drawing/render";
+import { STROKE_POINTS_SPLIT, keepPoint } from "@/lib/drawing/perf";
 import { BRUSH_TOOLS, CANVAS_SIZE, THUMB_SIZE, STAMP_SHAPES, type BrushTool, type StampShape, type Stroke } from "@/lib/heroes/rules";
 import { BRUSHES, PEN_COLORS, PEN_SIZES, roundPoint, STAMP_SIZES, STAMPS } from "@/lib/heroes/strokes";
 
@@ -15,6 +16,8 @@ export type DrawingCanvasHandle = {
   exportPng: () => Promise<Blob | null>;
   /** 그림 + 카드 목록용 작은 그림(384px, 같은 형식)을 함께 */
   exportImages: () => Promise<{ image: Blob; thumb: Blob | null } | null>;
+  /** 지금 선을 긋는 중인지 (긋는 중에는 저장을 미룹니다: 저장이 화면을 잠깐 멈추게 해서) */
+  busy: () => boolean;
 };
 
 type Props = {
@@ -32,6 +35,9 @@ type View = { scale: number; x: number; y: number };
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const RECENT_MAX = 6;
+/** 되돌리기를 빠르게: 이만큼 그릴 때마다 그림을 찍어 두고(최대 CHECKPOINT_MAX장), 거기서부터 다시 그립니다. */
+const CHECKPOINT_EVERY = 25;
+const CHECKPOINT_MAX = 6;
 
 /**
  * 아이패드 + 애플 펜슬용 그리기 캔버스 (docs/HERO_MAKER.md 4-3)
@@ -80,6 +86,9 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
   const gesture = useRef<{ dist: number; midX: number; midY: number; view: View } | null>(null);
   const pan = useRef<{ x: number; y: number; view: View } | null>(null);
   const frame = useRef<number | null>(null);
+  /** 확정 그림 캔버스에 지금 그려져 있는 기록 (새 기록만 덧그리려고) */
+  const rendered = useRef<{ ops: Stroke[]; under: HTMLImageElement | null }>({ ops: [], under: null });
+  const checkpoints = useRef<{ count: number; last: Stroke; data: ImageData }[]>([]);
 
   const [ops, setOps] = useState<Stroke[]>(initialStrokes);
   // 되돌리기 단위: 한 번의 동작으로 추가된 기록 수 (거울 모드면 2개가 한 번)
@@ -99,13 +108,49 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
 
   /* ───────────── 그리기 ───────────── */
 
-  const rebuildCommitted = useCallback((list: Stroke[]) => {
-    const c = committedRef.current ?? document.createElement("canvas");
-    committedRef.current = c;
-    c.width = CANVAS_SIZE;
-    c.height = CANVAS_SIZE;
-    renderAll(c.getContext("2d", { willReadFrequently: true })!, list, underImg);
-  }, [underImg]);
+  /**
+   * 확정 그림 캔버스를 기록(list)에 맞춥니다.
+   * - 새로 그린 것만 덧그립니다 (예전에는 한 획마다 처음부터 다 그려서, 채우기가 많으면 아이패드가 멈췄음).
+   * - 되돌리기처럼 앞부분이 바뀌면 가장 가까운 체크포인트에서부터 다시 그립니다.
+   * 이 캔버스는 willReadFrequently 없이 만듭니다(그래야 Safari가 GPU로 그려서 빠름).
+   */
+  const syncCommitted = useCallback(
+    (list: Stroke[]) => {
+      let c = committedRef.current;
+      if (!c) {
+        c = document.createElement("canvas");
+        c.width = CANVAS_SIZE;
+        c.height = CANVAS_SIZE;
+        committedRef.current = c;
+      }
+      const ctx = context2d(c);
+      const r = rendered.current;
+      let start: number;
+      const extends_ = r.under === underImg && list.length >= r.ops.length && (r.ops.length === 0 || list[r.ops.length - 1] === r.ops[r.ops.length - 1]);
+      if (extends_) {
+        start = r.ops.length;
+      } else {
+        if (r.under !== underImg) checkpoints.current = []; // 사진이 바뀌면 채우기 경계가 달라짐
+        const cp = checkpoints.current.filter((k) => k.count <= list.length && list[k.count - 1] === k.last).sort((a, b) => b.count - a.count)[0];
+        if (cp) {
+          ctx.putImageData(cp.data, 0, 0);
+          start = cp.count;
+        } else {
+          ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+          start = 0;
+        }
+      }
+      for (let i = start; i < list.length; i++) {
+        renderOp(ctx, list[i], true, underImg);
+        const count = i + 1;
+        if (count % CHECKPOINT_EVERY === 0 && !checkpoints.current.some((k) => k.count === count && k.last === list[i])) {
+          checkpoints.current = [...checkpoints.current, { count, last: list[i], data: ctx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE) }].slice(-CHECKPOINT_MAX);
+        }
+      }
+      rendered.current = { ops: list, under: underImg };
+    },
+    [underImg],
+  );
 
   const paint = useCallback(() => {
     frame.current = null;
@@ -128,9 +173,9 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
   }, [paint]);
 
   useEffect(() => {
-    rebuildCommitted(ops);
-    paint();
-  }, [ops, rebuildCommitted, paint]);
+    syncCommitted(ops);
+    schedulePaint();
+  }, [ops, syncCommitted, schedulePaint]);
 
   /** 내보내기: 사진이 있으면 사진 + 그림을 합친 JPEG, 없으면 투명 PNG. 작은 그림도 같은 형식 */
   const exportImages = async () => {
@@ -139,7 +184,11 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
     const c = committedRef.current;
     if (!c) return null;
     // 사진을 막 불러왔으면 채우기 경계가 바뀌므로 그리기 층을 다시 그립니다.
-    if (under && under !== underImg) renderAll(context2d(c, { willReadFrequently: true }), ops, under);
+    if (under && under !== underImg) {
+      renderAll(context2d(c), ops, under);
+      rendered.current = { ops, under };
+      checkpoints.current = [];
+    }
     const full = under ? composeWithUnderlay(c, under) : c;
     const type = under ? "image/jpeg" : "image/png";
     const small = scratchCanvas("thumb", THUMB_SIZE);
@@ -164,6 +213,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
   useImperativeHandle(ref, () => ({
     exportPng: async () => (await exportImages())?.image ?? null,
     exportImages,
+    busy: () => drawingPointer.current !== null,
   }));
 
   const commit = (added: Stroke[]) => {
@@ -300,7 +350,18 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
     if (!cur || !("points" in cur)) return;
     e.preventDefault();
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
-    for (const ev of events.length ? events : [e.nativeEvent]) cur.points.push(toCanvasPoint(ev));
+    // 애플 펜슬은 1초에 240번쯤 점을 보냅니다. 거의 같은 자리의 점은 버려서
+    // 그리기·저장을 가볍게 합니다 (화면에서 1픽셀보다 가까운 점).
+    for (const ev of events.length ? events : [e.nativeEvent]) {
+      const pt = toCanvasPoint(ev);
+      if (keepPoint(cur.points[cur.points.length - 1], pt, view.scale)) cur.points.push(pt);
+    }
+    // 아주 긴 획은 나눠서 확정합니다 (저장할 수 있는 한 획의 점 수에 걸리지 않게).
+    if (cur.points.length >= STROKE_POINTS_SPLIT) {
+      const tail = cur.points[cur.points.length - 1];
+      commit(withMirror(cur));
+      currentRef.current = { ...cur, points: [tail] };
+    }
     schedulePaint();
   };
 
