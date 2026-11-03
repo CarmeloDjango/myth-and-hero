@@ -40,6 +40,18 @@ async function SeriesGrid() {
         만들기 →
       </span>
     </Link>
+    <Link
+      href="/battle"
+      className="sticker pressable flex flex-wrap items-center justify-between gap-4 rounded-card bg-[#f3e1ff] px-6 py-5 transition-transform hover:-translate-y-1"
+    >
+      <span className="flex flex-col gap-1">
+        <span className="font-display text-[32px] leading-tight text-[#7a3fb0]">카드 배틀</span>
+        <span className="text-[17px] font-medium text-ink">도감 카드로 토리와 대결해요!</span>
+      </span>
+      <span className="inline-flex min-h-12 items-center rounded-button border-b-4 border-[#7a3fb0] bg-purple px-5 font-bold text-paper">
+        대결하기 →
+      </span>
+    </Link>
     <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
       {list.map((s) => (
         <Link
