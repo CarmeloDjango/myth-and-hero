@@ -99,6 +99,9 @@ model Character {
   @@index([seriesId, intellect(sort: Desc), id])
   @@index([seriesId, politics(sort: Desc), id])
   @@index([seriesId, charm(sort: Desc), id])
+  /// 부분 일치 검색(ILIKE '%관%')용 trigram 인덱스. pg_trgm 확장이 필요합니다(마이그레이션에서 생성).
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "Character_searchText_trgm_idx")
+  @@index([choseong(ops: raw("gin_trgm_ops"))], type: Gin, map: "Character_choseong_trgm_idx")
 }
 
 /// 특기: 궁술, 지략, 바다, 변신 …

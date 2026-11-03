@@ -1,131 +1,178 @@
 /**
- * 시드 데이터 (예시): 삼국지 세계관, 진영 4개, 인물 3명
- * 능력치는 예시 값입니다. 여러 번 실행해도 같은 결과가 됩니다(이미 있으면 수정).
+ * 시드 데이터 (예시): 삼국지 20명, 그리스신화 14명
+ * 능력치는 예시 값입니다(삼국지는 코에이 수치를 참고한 근사치).
+ * 여러 번 실행해도 같은 결과가 됩니다(이미 있으면 수정).
  * 실행 진입점은 prisma/seed.ts 입니다.
  */
 import { type PrismaClient, Role } from "../src/generated/prisma/client";
 import { buildSearchText, toChoseong } from "../src/lib/search/choseong";
 
-const STAT_LABELS = {
-  leadership: "통솔",
-  power: "무력",
-  intellect: "지력",
-  politics: "정치",
-  charm: "매력",
+type Stats = [leadership: number, power: number, intellect: number, politics: number, charm: number];
+
+type CharacterSeed = {
+  slug: string;
+  name: string;
+  originalName: string;
+  title: string;
+  aliases?: string[];
+  faction: string;
+  role: Role;
+  rarity: number;
+  stats: Stats;
+  summary: string;
+  funFacts?: string[];
 };
 
-const FACTIONS = [
-  { name: "촉", color: "#d7ffb8" },
-  { name: "위", color: "#ddf4ff" },
-  { name: "오", color: "#ffe2cc" },
-  { name: "기타", color: "#fff4cc" },
-];
+type SeriesSeed = {
+  slug: string;
+  name: string;
+  description: string;
+  themeColor: string;
+  order: number;
+  era: string;
+  statLabels: Record<"leadership" | "power" | "intellect" | "politics" | "charm", string>;
+  factions: { name: string; color: string }[];
+  characters: CharacterSeed[];
+};
 
-const CHARACTERS = [
-  {
-    slug: "guan-yu",
-    name: "관우",
-    originalName: "關羽",
-    title: "미염공",
-    aliases: ["운장", "관운장"],
-    faction: "촉",
-    role: Role.GENERAL,
-    rarity: 5,
-    stats: { leadership: 95, power: 97, intellect: 75, politics: 62, charm: 93 },
-    summary: "유비, 장비와 형제가 되기로 약속하고 평생 그 약속을 지킨 의리의 장수예요.",
-    biography:
-      "관우는 아주 먼 옛날 중국에 살았던 장수예요. 키가 크고 수염이 길고 멋져서 사람들은 관우를 '미염공'이라고 불렀어요.",
-    funFacts: ["관우의 무기는 청룡언월도예요.", "관우가 탄 말은 적토마예요."],
-    era: "후한 말",
-  },
-  {
-    slug: "liu-bei",
-    name: "유비",
-    originalName: "劉備",
-    title: "마음이 따뜻한 임금",
-    aliases: ["현덕"],
-    faction: "촉",
-    role: Role.RULER,
-    rarity: 5,
-    stats: { leadership: 75, power: 73, intellect: 74, politics: 78, charm: 99 },
-    summary: "백성을 아끼는 마음으로 촉나라를 세운 임금이에요.",
-    biography: "유비는 돗자리를 짜서 팔던 청년이었지만, 관우·장비와 함께 큰 뜻을 품고 나라를 세웠어요.",
-    funFacts: ["유비는 귀가 아주 컸다고 전해져요."],
-    era: "후한 말",
-  },
-  {
-    slug: "cao-cao",
-    name: "조조",
-    originalName: "曹操",
-    title: "난세의 영웅",
-    aliases: ["맹덕"],
-    faction: "위",
-    role: Role.RULER,
-    rarity: 5,
-    stats: { leadership: 96, power: 72, intellect: 91, politics: 94, charm: 96 },
-    summary: "꾀가 많고 용감해서 위나라의 기틀을 세운 사람이에요.",
-    biography: "조조는 뛰어난 장수이자 시인이었어요. 재능 있는 사람을 아껴서 많은 인재를 모았어요.",
-    funFacts: ["조조는 시를 아주 잘 지었어요."],
-    era: "후한 말",
-  },
-];
+const { GENERAL, STRATEGIST, RULER, GOD, HERO, MONSTER } = Role;
+
+const THREE_KINGDOMS: SeriesSeed = {
+  slug: "three-kingdoms",
+  name: "삼국지",
+  description: "위·촉·오 세 나라 장수들의 대결",
+  themeColor: "#58cc02",
+  order: 1,
+  era: "후한 말",
+  statLabels: { leadership: "통솔", power: "무력", intellect: "지력", politics: "정치", charm: "매력" },
+  factions: [
+    { name: "촉", color: "#d7ffb8" },
+    { name: "위", color: "#ddf4ff" },
+    { name: "오", color: "#ffe2cc" },
+    { name: "기타", color: "#fff4cc" },
+  ],
+  characters: [
+    { slug: "guan-yu", name: "관우", originalName: "關羽", title: "미염공", aliases: ["운장", "관운장"], faction: "촉", role: GENERAL, rarity: 5, stats: [95, 97, 75, 62, 93], summary: "유비, 장비와 형제가 되기로 약속하고 평생 그 약속을 지킨 의리의 장수예요.", funFacts: ["관우의 무기는 청룡언월도예요.", "관우가 탄 말은 적토마예요."] },
+    { slug: "liu-bei", name: "유비", originalName: "劉備", title: "마음이 따뜻한 임금", aliases: ["현덕"], faction: "촉", role: RULER, rarity: 5, stats: [75, 73, 74, 78, 99], summary: "백성을 아끼는 마음으로 촉나라를 세운 임금이에요.", funFacts: ["유비는 귀가 아주 컸다고 전해져요."] },
+    { slug: "zhang-fei", name: "장비", originalName: "張飛", title: "장판교의 호랑이", aliases: ["익덕"], faction: "촉", role: GENERAL, rarity: 4, stats: [85, 98, 30, 22, 45], summary: "다리 위에서 큰 소리 한 번으로 적군을 멈추게 한 용감한 장수예요." },
+    { slug: "zhuge-liang", name: "제갈량", originalName: "諸葛亮", title: "와룡 선생", aliases: ["공명", "제갈공명"], faction: "촉", role: STRATEGIST, rarity: 5, stats: [92, 38, 100, 95, 92], summary: "깃털 부채를 든 천재 책사. 유비가 세 번이나 찾아가 모셔 왔어요.", funFacts: ["유비가 세 번 찾아간 이야기를 '삼고초려'라고 해요."] },
+    { slug: "zhao-yun", name: "조운", originalName: "趙雲", title: "상산의 용", aliases: ["자룡", "조자룡"], faction: "촉", role: GENERAL, rarity: 5, stats: [91, 96, 76, 65, 81], summary: "적군 한가운데를 뚫고 유비의 아기를 구해 낸 용감한 장수예요." },
+    { slug: "ma-chao", name: "마초", originalName: "馬超", title: "비단 같은 장수", aliases: ["맹기"], faction: "촉", role: GENERAL, rarity: 4, stats: [88, 97, 44, 26, 82], summary: "멋진 갑옷을 입고 말을 잘 타서 '금마초'라고 불렸어요." },
+    { slug: "huang-zhong", name: "황충", originalName: "黃忠", title: "늙지 않는 명궁", aliases: ["한승"], faction: "촉", role: GENERAL, rarity: 4, stats: [86, 93, 60, 52, 75], summary: "할아버지가 되어서도 활을 백발백중 쏘았던 장수예요." },
+    { slug: "cao-cao", name: "조조", originalName: "曹操", title: "난세의 영웅", aliases: ["맹덕"], faction: "위", role: RULER, rarity: 5, stats: [96, 72, 91, 94, 96], summary: "꾀가 많고 용감해서 위나라의 기틀을 세운 사람이에요.", funFacts: ["조조는 시를 아주 잘 지었어요."] },
+    { slug: "sima-yi", name: "사마의", originalName: "司馬懿", title: "참을성의 책사", aliases: ["중달"], faction: "위", role: STRATEGIST, rarity: 4, stats: [98, 63, 96, 93, 87], summary: "제갈량과 지혜를 겨룬 위나라의 책사. 꾹 참고 기다리는 데 선수였어요." },
+    { slug: "xiahou-dun", name: "하후돈", originalName: "夏侯惇", title: "외눈의 장군", aliases: ["원양"], faction: "위", role: GENERAL, rarity: 4, stats: [89, 90, 58, 70, 86], summary: "조조를 가장 오래 지킨 든든한 장수예요." },
+    { slug: "zhang-liao", name: "장료", originalName: "張遼", title: "합비의 수호자", aliases: ["문원"], faction: "위", role: GENERAL, rarity: 4, stats: [93, 92, 78, 58, 80], summary: "적은 병사로 많은 적을 막아 낸 위나라의 명장이에요." },
+    { slug: "xu-chu", name: "허저", originalName: "許褚", title: "호랑이 바보", aliases: ["중강"], faction: "위", role: GENERAL, rarity: 3, stats: [65, 96, 36, 20, 60], summary: "힘이 장사여서 조조를 곁에서 지킨 경호 대장이에요." },
+    { slug: "sun-quan", name: "손권", originalName: "孫權", title: "강동의 임금", aliases: ["중모"], faction: "오", role: RULER, rarity: 4, stats: [76, 67, 80, 89, 95], summary: "젊은 나이에 오나라를 이어받아 오래오래 지킨 임금이에요." },
+    { slug: "zhou-yu", name: "주유", originalName: "周瑜", title: "적벽의 지휘관", aliases: ["공근"], faction: "오", role: STRATEGIST, rarity: 5, stats: [97, 71, 96, 86, 93], summary: "적벽대전에서 불 공격으로 조조의 큰 배들을 물리쳤어요." },
+    { slug: "lu-meng", name: "여몽", originalName: "呂蒙", title: "공부하는 장수", aliases: ["자명"], faction: "오", role: GENERAL, rarity: 3, stats: [91, 81, 89, 78, 82], summary: "어른이 되어서 열심히 공부해 지혜로운 장수가 되었어요.", funFacts: ["'괄목상대'라는 말이 여몽 이야기에서 나왔어요."] },
+    { slug: "gan-ning", name: "감녕", originalName: "甘寧", title: "방울 소리 장수", aliases: ["흥패"], faction: "오", role: GENERAL, rarity: 3, stats: [86, 94, 72, 30, 62], summary: "허리에 방울을 달고 다녀서 소리만 들어도 알 수 있었대요." },
+    { slug: "sun-ce", name: "손책", originalName: "孫策", title: "작은 패왕", aliases: ["백부"], faction: "오", role: RULER, rarity: 4, stats: [92, 92, 69, 70, 92], summary: "손권의 형. 용감하게 싸워 강동 땅을 얻었어요." },
+    { slug: "lu-bu", name: "여포", originalName: "呂布", title: "천하제일 무장", aliases: ["봉선"], faction: "기타", role: GENERAL, rarity: 5, stats: [87, 100, 26, 13, 40], summary: "삼국지에서 가장 힘이 센 장수. 적토마를 타고 방천화극을 휘둘렀어요." },
+    { slug: "dong-zhuo", name: "동탁", originalName: "董卓", title: "욕심쟁이 권력자", aliases: ["중영"], faction: "기타", role: RULER, rarity: 2, stats: [84, 86, 64, 18, 22], summary: "황제를 마음대로 움직이려 해서 모두가 힘을 모아 맞섰어요." },
+    { slug: "yuan-shao", name: "원소", originalName: "袁紹", title: "명문가의 대장", aliases: ["본초"], faction: "기타", role: RULER, rarity: 3, stats: [80, 69, 70, 74, 90], summary: "많은 군사를 가졌지만 관도 싸움에서 조조에게 졌어요." },
+  ],
+};
+
+const GREEK: SeriesSeed = {
+  slug: "greek-myth",
+  name: "그리스신화",
+  description: "올림포스의 신들과 괴물을 물리친 영웅들",
+  themeColor: "#ce82ff",
+  order: 0,
+  era: "신화 시대",
+  statLabels: { leadership: "권능", power: "힘", intellect: "지혜", politics: "용기", charm: "매력" },
+  factions: [
+    { name: "올림포스", color: "#f3e1ff" },
+    { name: "영웅", color: "#ddf4ff" },
+    { name: "괴물", color: "#ffe2cc" },
+  ],
+  characters: [
+    { slug: "zeus", name: "제우스", originalName: "Ζεύς", title: "천둥의 신", faction: "올림포스", role: GOD, rarity: 5, stats: [100, 95, 85, 90, 92], summary: "올림포스 신들의 왕. 하늘을 다스리고 번개를 던져요.", funFacts: ["제우스의 상징 동물은 독수리예요."] },
+    { slug: "athena", name: "아테나", originalName: "Ἀθηνᾶ", title: "지혜의 여신", faction: "올림포스", role: GOD, rarity: 5, stats: [92, 85, 100, 95, 90], summary: "지혜와 전쟁 전략의 여신. 영웅들을 몰래 도와주었어요.", funFacts: ["아테네라는 도시 이름이 아테나에게서 왔어요."] },
+    { slug: "poseidon", name: "포세이돈", originalName: "Ποσειδῶν", title: "바다의 신", faction: "올림포스", role: GOD, rarity: 5, stats: [95, 96, 70, 80, 78], summary: "삼지창을 휘둘러 파도와 지진을 일으키는 바다의 왕이에요." },
+    { slug: "hades", name: "하데스", originalName: "Ἅιδης", title: "저승의 왕", faction: "올림포스", role: GOD, rarity: 4, stats: [94, 88, 82, 70, 55], summary: "땅속 세계를 다스리는 신. 무섭게 보이지만 규칙을 잘 지켜요." },
+    { slug: "apollo", name: "아폴론", originalName: "Ἀπόλλων", title: "태양과 음악의 신", faction: "올림포스", role: GOD, rarity: 4, stats: [88, 84, 88, 75, 98], summary: "리라를 연주하고 활을 잘 쏘는 빛나는 신이에요." },
+    { slug: "artemis", name: "아르테미스", originalName: "Ἄρτεμις", title: "사냥의 여신", faction: "올림포스", role: GOD, rarity: 4, stats: [85, 86, 80, 92, 85], summary: "숲과 동물을 지키는 사냥의 여신. 아폴론의 쌍둥이예요." },
+    { slug: "hermes", name: "헤르메스", originalName: "Ἑρμῆς", title: "날개 달린 전령", faction: "올림포스", role: GOD, rarity: 4, stats: [80, 65, 94, 80, 90], summary: "날개 달린 신발로 누구보다 빨리 소식을 전하는 신이에요." },
+    { slug: "heracles", name: "헤라클레스", originalName: "Ἡρακλῆς", title: "열두 과업의 영웅", faction: "영웅", role: HERO, rarity: 5, stats: [80, 100, 60, 98, 88], summary: "어려운 일 열두 가지를 모두 해낸 그리스 최고의 힘센 영웅이에요.", funFacts: ["아기 때 뱀 두 마리를 맨손으로 물리쳤대요."] },
+    { slug: "perseus", name: "페르세우스", originalName: "Περσεύς", title: "메두사를 이긴 영웅", faction: "영웅", role: HERO, rarity: 4, stats: [75, 85, 82, 95, 86], summary: "거울 방패로 메두사를 직접 보지 않고 물리쳤어요." },
+    { slug: "theseus", name: "테세우스", originalName: "Θησεύς", title: "미궁의 영웅", faction: "영웅", role: HERO, rarity: 4, stats: [82, 88, 84, 94, 84], summary: "실타래를 따라 미궁을 빠져나오며 미노타우로스를 물리쳤어요." },
+    { slug: "achilles", name: "아킬레우스", originalName: "Ἀχιλλεύς", title: "가장 빠른 전사", faction: "영웅", role: HERO, rarity: 5, stats: [85, 98, 62, 96, 90], summary: "트로이 전쟁에서 가장 강했던 전사. 발뒤꿈치만 약했어요.", funFacts: ["'아킬레스건'이라는 말이 여기서 나왔어요."] },
+    { slug: "odysseus", name: "오디세우스", originalName: "Ὀδυσσεύς", title: "꾀 많은 영웅", faction: "영웅", role: HERO, rarity: 4, stats: [86, 80, 99, 88, 85], summary: "트로이 목마 작전을 생각해 낸 지혜로운 영웅이에요." },
+    { slug: "medusa", name: "메두사", originalName: "Μέδουσα", title: "뱀 머리 괴물", faction: "괴물", role: MONSTER, rarity: 3, stats: [60, 70, 55, 50, 30], summary: "머리카락이 뱀이고, 눈을 마주치면 돌로 변하게 만들었어요." },
+    { slug: "minotaur", name: "미노타우로스", originalName: "Μινώταυρος", title: "미궁의 황소", faction: "괴물", role: MONSTER, rarity: 3, stats: [50, 92, 25, 60, 15], summary: "황소 머리를 한 괴물. 복잡한 미궁 깊은 곳에 살았어요." },
+  ],
+};
+
+export const SEED_SERIES: SeriesSeed[] = [GREEK, THREE_KINGDOMS];
 
 /** 시드 데이터를 넣고 행 수를 돌려줍니다. 어떤 드라이버 어댑터의 PrismaClient든 받을 수 있습니다. */
 export async function seed(db: PrismaClient) {
   // upsert는 내부적으로 트랜잭션을 쓰므로, HTTP 드라이버에서도 돌도록 조회 후 생성/수정합니다.
-  const seriesData = {
-    name: "삼국지",
-    description: "위·촉·오 세 나라 장수들의 대결",
-    statLabels: STAT_LABELS,
-    order: 1,
-  };
-  const existingSeries = await db.series.findUnique({ where: { slug: "three-kingdoms" } });
-  const series = existingSeries
-    ? await db.series.update({ where: { id: existingSeries.id }, data: seriesData })
-    : await db.series.create({ data: { slug: "three-kingdoms", ...seriesData } });
-
-  const factionIds = new Map<string, string>();
-  for (const f of FACTIONS) {
-    const existing = await db.faction.findUnique({
-      where: { seriesId_name: { seriesId: series.id, name: f.name } },
-    });
-    const faction = existing
-      ? await db.faction.update({ where: { id: existing.id }, data: { color: f.color } })
-      : await db.faction.create({ data: { seriesId: series.id, name: f.name, color: f.color } });
-    factionIds.set(f.name, faction.id);
-  }
-
-  for (const c of CHARACTERS) {
-    const data = {
-      seriesId: series.id,
-      factionId: factionIds.get(c.faction) ?? null,
-      name: c.name,
-      originalName: c.originalName,
-      title: c.title,
-      aliases: c.aliases,
-      searchText: buildSearchText(c),
-      choseong: toChoseong(c.name),
-      role: c.role,
-      rarity: c.rarity,
-      ...c.stats,
-      summary: c.summary,
-      biography: c.biography,
-      funFacts: c.funFacts,
-      era: c.era,
-      published: true,
+  for (const s of SEED_SERIES) {
+    const seriesData = {
+      name: s.name,
+      description: s.description,
+      themeColor: s.themeColor,
+      statLabels: s.statLabels,
+      order: s.order,
     };
-    const existing = await db.character.findUnique({ where: { slug: c.slug }, select: { id: true } });
-    if (existing) {
-      await db.character.update({ where: { id: existing.id }, data });
-    } else {
-      await db.character.create({ data: { slug: c.slug, ...data } });
+    const existingSeries = await db.series.findUnique({ where: { slug: s.slug } });
+    const series = existingSeries
+      ? await db.series.update({ where: { id: existingSeries.id }, data: seriesData })
+      : await db.series.create({ data: { slug: s.slug, ...seriesData } });
+
+    const factionIds = new Map<string, string>();
+    for (const f of s.factions) {
+      const existing = await db.faction.findUnique({
+        where: { seriesId_name: { seriesId: series.id, name: f.name } },
+      });
+      const faction = existing
+        ? await db.faction.update({ where: { id: existing.id }, data: { color: f.color } })
+        : await db.faction.create({ data: { seriesId: series.id, name: f.name, color: f.color } });
+      factionIds.set(f.name, faction.id);
+    }
+
+    for (const c of s.characters) {
+      const [leadership, power, intellect, politics, charm] = c.stats;
+      const aliases = c.aliases ?? [];
+      const data = {
+        seriesId: series.id,
+        factionId: factionIds.get(c.faction) ?? null,
+        name: c.name,
+        originalName: c.originalName,
+        title: c.title,
+        aliases,
+        searchText: buildSearchText({ name: c.name, aliases, title: c.title }),
+        choseong: toChoseong(c.name),
+        role: c.role,
+        rarity: c.rarity,
+        leadership,
+        power,
+        intellect,
+        politics,
+        charm,
+        summary: c.summary,
+        biography: c.summary,
+        funFacts: c.funFacts ?? [],
+        era: s.era,
+        published: true,
+      };
+      const existing = await db.character.findUnique({ where: { slug: c.slug }, select: { id: true } });
+      if (existing) {
+        await db.character.update({ where: { id: existing.id }, data });
+      } else {
+        await db.character.create({ data: { slug: c.slug, ...data } });
+      }
     }
   }
 
-  const [series_, factions, characters] = await Promise.all([
+  const [series, factions, characters] = await Promise.all([
     db.series.count(),
     db.faction.count(),
     db.character.count(),
   ]);
-  return { series: series_, factions, characters };
+  return { series, factions, characters };
 }
