@@ -10,6 +10,13 @@ import {
   type CharacterPageInput,
   type SortKey,
 } from "@/lib/characters/browse";
+import {
+  RELATION_BACKWARD,
+  RELATION_FORWARD,
+  RIVAL_TYPES,
+  type CharacterDetail,
+  type RelatedCharacter,
+} from "@/lib/characters/detail";
 import { getDb } from "@/lib/db";
 import { isChoseongOnly } from "@/lib/search/choseong";
 
@@ -134,4 +141,103 @@ export async function getSeriesList() {
       _count: { select: { characters: { where: { published: true } } } },
     },
   });
+}
+
+/**
+ * 인물 상세: 능력치, 열전, 관계(양방향), 이전/다음 인물(이름순)
+ * 없거나 공개되지 않은 인물이면 null을 돌려줍니다.
+ */
+export async function getCharacterDetail(seriesSlug: string, slug: string): Promise<CharacterDetail | null> {
+  const db = getDb();
+  const c = await db.character.findFirst({
+    where: { slug, published: true, series: { slug: seriesSlug } },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      originalName: true,
+      title: true,
+      aliases: true,
+      rarity: true,
+      role: true,
+      era: true,
+      summary: true,
+      biography: true,
+      funFacts: true,
+      leadership: true,
+      power: true,
+      intellect: true,
+      politics: true,
+      charm: true,
+      seriesId: true,
+      faction: { select: { name: true, color: true } },
+      series: { select: { slug: true, name: true, statLabels: true } },
+    },
+  });
+  if (!c) return null;
+
+  const relatedSelect = {
+    slug: true,
+    name: true,
+    originalName: true,
+    published: true,
+    faction: { select: { color: true } },
+  } as const;
+
+  const [outgoing, incoming, prev, next] = await Promise.all([
+    db.relation.findMany({ where: { fromId: c.id }, select: { type: true, to: { select: relatedSelect } } }),
+    db.relation.findMany({ where: { toId: c.id }, select: { type: true, from: { select: relatedSelect } } }),
+    db.character.findFirst({
+      where: { seriesId: c.seriesId, published: true, name: { lt: c.name } },
+      orderBy: [{ name: "desc" }, { id: "desc" }],
+      select: { slug: true, name: true },
+    }),
+    db.character.findFirst({
+      where: { seriesId: c.seriesId, published: true, name: { gt: c.name } },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      select: { slug: true, name: true },
+    }),
+  ]);
+
+  const related: RelatedCharacter[] = [
+    ...outgoing.map((r) => ({ who: r.to, label: RELATION_FORWARD[r.type], type: r.type })),
+    ...incoming.map((r) => ({ who: r.from, label: RELATION_BACKWARD[r.type], type: r.type })),
+  ]
+    .filter((r) => r.who.published)
+    // 친구 쪽 관계를 먼저, 라이벌은 뒤에
+    .sort((a, b) => Number(RIVAL_TYPES.has(a.type)) - Number(RIVAL_TYPES.has(b.type)))
+    .map((r) => ({
+      slug: r.who.slug,
+      name: r.who.name,
+      originalName: r.who.originalName,
+      label: r.label,
+      isRival: RIVAL_TYPES.has(r.type),
+      factionColor: r.who.faction?.color ?? null,
+    }));
+
+  return {
+    slug: c.slug,
+    name: c.name,
+    originalName: c.originalName,
+    title: c.title,
+    aliases: c.aliases,
+    rarity: c.rarity,
+    roleLabel: ROLE_LABEL[c.role] ?? c.role,
+    era: c.era,
+    summary: c.summary,
+    biography: c.biography,
+    funFacts: c.funFacts,
+    stats: {
+      leadership: c.leadership,
+      power: c.power,
+      intellect: c.intellect,
+      politics: c.politics,
+      charm: c.charm,
+    },
+    faction: c.faction,
+    series: { slug: c.series.slug, name: c.series.name, statLabels: toStatLabels(c.series.statLabels) },
+    related,
+    prev,
+    next,
+  };
 }

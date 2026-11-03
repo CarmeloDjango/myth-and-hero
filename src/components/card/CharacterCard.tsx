@@ -1,4 +1,4 @@
-import type { CharacterCardData, StatLabels } from "@/lib/characters/browse";
+import { cardGlyph, type CharacterCardData, type StatLabels } from "@/lib/characters/browse";
 
 /** 진영 배경색 → 같은 계열의 진한 글자색 (docs/DESIGN.md 2장) */
 const FACTION_TEXT: Record<string, string> = {
@@ -12,7 +12,7 @@ const FACTION_TEXT: Record<string, string> = {
 export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: StatLabels }) {
   const tint = c.faction?.color ?? "#f7f7f7";
   const factionText = FACTION_TEXT[tint.toLowerCase()] ?? "#4b4b4b";
-  const glyph = c.originalName?.[0] ?? c.name[0];
+  const glyph = cardGlyph(c.name, c.originalName);
   const stats = [
     { label: labels.power, value: c.power, color: "var(--color-orange)" },
     { label: labels.intellect, value: c.intellect, color: "var(--color-purple)" },

@@ -113,3 +113,13 @@ export type CharacterPage = {
   /** 첫 페이지에서만 계산합니다. */
   total: number | null;
 };
+
+/**
+ * 일러스트 자리에 크게 보여줄 한 글자.
+ * 한자 이름(關羽)이 있으면 한자, 아니면(Ζεύς 등) 한글 이름 첫 글자를 씁니다.
+ */
+export function cardGlyph(name: string, originalName: string | null): string {
+  const first = originalName?.[0];
+  if (first && /\p{Script=Han}/u.test(first)) return first;
+  return name[0] ?? "?";
+}

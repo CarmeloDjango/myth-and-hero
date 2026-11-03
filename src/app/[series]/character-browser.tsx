@@ -2,6 +2,7 @@
 
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useQueryStates } from "nuqs";
 
 import { fetchCharacterPageAction } from "@/app/actions/characters";
@@ -126,7 +127,14 @@ export function CharacterBrowser({ seriesSlug, statLabels, factions, roles }: Pr
           }`}
         >
           {items.map((c) => (
-            <CharacterCard key={c.slug} c={c} labels={statLabels} />
+            <Link
+              key={c.slug}
+              href={`/${seriesSlug}/${c.slug}`}
+              aria-label={`${c.name} 카드 자세히 보기`}
+              className="rounded-card focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-blue"
+            >
+              <CharacterCard c={c} labels={statLabels} />
+            </Link>
           ))}
           {query.isFetchingNextPage
             ? Array.from({ length: 3 }, (_, i) => <CharacterCardSkeleton key={`s${i}`} />)
