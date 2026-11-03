@@ -22,7 +22,7 @@ export function CoverDrawing({ worldId, slug, background, hasDrawing }: { worldI
             disabled={leaving || !ready}
             onClick={async () => {
               setLeaving(true);
-              if (!(await flush())) {
+              if (!(await flush().catch(() => false))) {
                 setLeaving(false);
                 return;
               }

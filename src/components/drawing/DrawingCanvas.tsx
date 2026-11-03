@@ -2,7 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import { composeWithUnderlay, mirrorOp, renderAll, renderOp } from "@/lib/drawing/render";
+import { composeWithUnderlay, context2d, mirrorOp, renderAll, renderOp, scratchCanvas } from "@/lib/drawing/render";
 import { BRUSH_TOOLS, CANVAS_SIZE, THUMB_SIZE, STAMP_SHAPES, type BrushTool, type StampShape, type Stroke } from "@/lib/heroes/rules";
 import { BRUSHES, PEN_COLORS, PEN_SIZES, roundPoint, STAMP_SIZES, STAMPS } from "@/lib/heroes/strokes";
 
@@ -134,20 +134,30 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
 
   /** 내보내기: 사진이 있으면 사진 + 그림을 합친 JPEG, 없으면 투명 PNG. 작은 그림도 같은 형식 */
   const exportImages = async () => {
-    const under = await underLoad.current;
+    // 사진을 못 불러오면 10초 뒤 사진 없이 진행 (멈추지 않게)
+    const under = await Promise.race([underLoad.current, new Promise<null>((r) => setTimeout(() => r(null), 10_000))]);
     const c = committedRef.current;
     if (!c) return null;
     // 사진을 막 불러왔으면 채우기 경계가 바뀌므로 그리기 층을 다시 그립니다.
-    if (under && under !== underImg) renderAll(c.getContext("2d", { willReadFrequently: true })!, ops, under);
+    if (under && under !== underImg) renderAll(context2d(c, { willReadFrequently: true }), ops, under);
     const full = under ? composeWithUnderlay(c, under) : c;
     const type = under ? "image/jpeg" : "image/png";
-    const small = document.createElement("canvas");
-    small.width = small.height = THUMB_SIZE;
-    const sx = small.getContext("2d")!;
+    const small = scratchCanvas("thumb", THUMB_SIZE);
+    const sx = context2d(small);
+    sx.clearRect(0, 0, THUMB_SIZE, THUMB_SIZE);
     sx.imageSmoothingQuality = "high";
     sx.drawImage(full, 0, 0, THUMB_SIZE, THUMB_SIZE);
-    const toBlob = (cv: HTMLCanvasElement, q?: number) => new Promise<Blob | null>((r) => cv.toBlob(r, type, q));
-    const [image, thumb] = await Promise.all([toBlob(full, 0.85), toBlob(small, 0.8)]);
+    // toBlob이 메모리 부족으로 응답하지 않는 경우가 있어 15초 뒤 포기합니다.
+    const toBlob = (cv: HTMLCanvasElement, q?: number) =>
+      new Promise<Blob | null>((r) => {
+        const t = setTimeout(() => r(null), 15_000);
+        cv.toBlob((b) => {
+          clearTimeout(t);
+          r(b);
+        }, type, q);
+      });
+    const image = await toBlob(full, 0.85);
+    const thumb = image ? await toBlob(small, 0.8) : null;
     return image ? { image, thumb } : null;
   };
 
