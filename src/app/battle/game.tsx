@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { BattleCard, CardBack } from "@/components/battle/BattleCard";
 import { ProfileAvatar } from "@/components/family/ProfileAvatar";
@@ -15,6 +15,23 @@ import { AbilityBurst, Confetti, CrisisVignette, DeathGhosts, DivineFlash, DragA
 import { seatName, type Seat } from "./types";
 
 const other = (s: Side) => (1 - s) as Side;
+
+/**
+ * 키가 낮은 가로 화면(아이패드 미니·에어 가로)이면 한 화면에 다 보이도록 좁은 배치:
+ * 왼쪽에 필드, 오른쪽에 손패, 카드는 작게.
+ */
+const COMPACT_QUERY = "(orientation: landscape) and (max-height: 900px)";
+function useCompact(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const m = window.matchMedia(COMPACT_QUERY);
+      m.addEventListener("change", cb);
+      return () => m.removeEventListener("change", cb);
+    },
+    () => window.matchMedia(COMPACT_QUERY).matches,
+    () => false,
+  );
+}
 
 /**
  * 게임 화면
@@ -60,6 +77,7 @@ export function Game({
   /** 끌기가 끝난 직후 따라오는 클릭을 무시할 때까지의 시각 */
   const suppressClickUntil = useRef(0);
   const handRef = useRef<HTMLDivElement>(null);
+  const compact = useCompact();
   // 첫 판 손가락 안내: 아이마다 첫 판이 끝날 때까지 (이 기기에 기억)
   const [learners] = useState<Set<string>>(() => {
     const out = new Set<string>();
@@ -216,8 +234,10 @@ export function Game({
   const dropTarget = (x: number, y: number, d: Drag): string | "leader" | "board" | null => {
     const el = document.elementFromPoint(x, y);
     if (d.kind === "hand") {
-      const handTop = handRef.current?.getBoundingClientRect().top ?? Infinity;
-      return el?.closest('[data-dropzone="board"]') || y < handTop - 16 ? "board" : null;
+      // 필드 위, 또는 손패 칸 밖이면 내기 (손패 칸 안에 다시 놓으면 취소)
+      const h = handRef.current?.getBoundingClientRect();
+      const inHand = !!h && x >= h.left - 8 && x <= h.right + 8 && y >= h.top - 16 && y <= h.bottom + 8;
+      return el?.closest('[data-dropzone="board"]') || !inHand ? "board" : null;
     }
     if (el?.closest(`[data-leader="${top}"]`)) return "leader";
     const uid = el?.closest<HTMLElement>("[data-uid]")?.dataset.uid;
@@ -352,128 +372,144 @@ export function Game({
   const playedNow = fx.events.find((e): e is Extract<BattleEvent, { type: "play" }> => e.type === "play");
 
   return (
-    <div className="flex select-none flex-col gap-3" data-battle-turn={s.turn} data-battle-bottom={bottom} data-battle-winner={s.winner ?? undefined}>
-      <PlayerBar
-        seat={seats[top]}
-        side={top}
-        player={foe}
-        isTurn={s.turn === top}
-        hidden
-        targetable={canTarget("leader") || (drag?.kind === "unit" && !checkAction(s, { type: "attack", attacker: drag.uid, target: "leader" }))}
-        pointer={hint?.kind === "target" && hint.uid === "leader"}
-        onTarget={() => selected && void act({ type: "attack", attacker: selected, target: "leader" })}
-        hits={damageOn(top, "leader")}
-        fxId={fx.id}
-      />
-      <Board
-        label={`${seatName(seats[top])} 필드`}
-        units={foe.board}
-        fxId={fx.id}
-        damageOn={(uid) => damageOn(top, uid)}
-        isTarget={(uid) => canTarget(uid) || (drag?.kind === "unit" && !checkAction(s, { type: "attack", attacker: drag.uid, target: uid }))}
-        pointerUid={hint?.kind === "target" && hint.uid !== "leader" ? hint.uid : null}
-        playedUid={playedNow?.side === top ? playedNow.uid : null}
-        onTap={(u) => (selected ? void act({ type: "attack", attacker: selected, target: u.uid }) : setNotice("내 카드를 먼저 골라요."))}
-      />
+    <div
+      className={compact ? "grid select-none grid-cols-[minmax(0,1fr)_212px] items-start gap-3" : "flex select-none flex-col gap-3"}
+      data-battle-turn={s.turn}
+      data-battle-bottom={bottom}
+      data-battle-winner={s.winner ?? undefined}
+      data-battle-compact={compact || undefined}
+    >
+      <div className="flex min-w-0 flex-col gap-3">
+        <PlayerBar
+          seat={seats[top]}
+          side={top}
+          player={foe}
+          isTurn={s.turn === top}
+          hidden
+          targetable={canTarget("leader") || (drag?.kind === "unit" && !checkAction(s, { type: "attack", attacker: drag.uid, target: "leader" }))}
+          pointer={hint?.kind === "target" && hint.uid === "leader"}
+          onTarget={() => selected && void act({ type: "attack", attacker: selected, target: "leader" })}
+          hits={damageOn(top, "leader")}
+          fxId={fx.id}
+        />
+        <Board
+          compact={compact}
+          label={`${seatName(seats[top])} 필드`}
+          units={foe.board}
+          fxId={fx.id}
+          damageOn={(uid) => damageOn(top, uid)}
+          isTarget={(uid) => canTarget(uid) || (drag?.kind === "unit" && !checkAction(s, { type: "attack", attacker: drag.uid, target: uid }))}
+          pointerUid={hint?.kind === "target" && hint.uid !== "leader" ? hint.uid : null}
+          playedUid={playedNow?.side === top ? playedNow.uid : null}
+          onTap={(u) => (selected ? void act({ type: "attack", attacker: selected, target: u.uid }) : setNotice("내 카드를 먼저 골라요."))}
+        />
 
-      <div className="flex items-center gap-2">
-        <p role="status" aria-live="polite" className="min-h-8 flex-1 rounded-button bg-paper-dim px-4 py-1.5 text-center text-[17px] font-bold">
-          {guide}
+        <div className="flex items-center gap-2">
+          <p role="status" aria-live="polite" className="min-h-8 flex-1 rounded-button bg-paper-dim px-4 py-1.5 text-center text-[17px] font-bold">
+            {guide}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setMuted(!muted);
+              setMutedState(!muted);
+              if (muted) playSound("tap");
+            }}
+            aria-label={muted ? "소리 켜기" : "소리 끄기"}
+            aria-pressed={!muted}
+            className="sticker pressable size-11 shrink-0 rounded-full bg-paper text-xl"
+          >
+            {muted ? "🔇" : "🔊"}
+          </button>
+        </div>
+
+        <Board
+          compact={compact}
+          label="내 필드"
+          empty={drag?.kind === "hand" ? "여기에 놓아요!" : "내 필드 (카드를 내면 여기로)"}
+          dropzone
+          glow={drag?.kind === "hand" && drag.hot}
+          units={me.board}
+          fxId={fx.id}
+          damageOn={(uid) => damageOn(bottom, uid)}
+          isSelected={(uid) => selected === uid || (drag?.kind === "unit" && drag.uid === uid)}
+          isReady={(u) => myTurn && u.ready}
+          pointerUid={hint?.kind === "unit" ? hint.uid : null}
+          playedUid={playedNow?.side === bottom ? playedNow.uid : null}
+          dragHandlers={(u) =>
+            myTurn && u.ready
+              ? {
+                  onPointerDown: (e) => {
+                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    onDragStart(e, { kind: "unit", uid: u.uid, sx: e.clientX, sy: e.clientY, fx: r.left + r.width / 2, fy: r.top + r.height / 2 });
+                  },
+                }
+              : null
+          }
+          onTap={(u) =>
+            guarded(() => {
+              if (!myTurn) return;
+              if (!u.ready) {
+                setNotice(`${u.card.name}은(는) 다음 차례에 공격할 수 있어요.`);
+                return;
+              }
+              setNotice(undefined);
+              playSound("tap");
+              setSelected((cur) => (cur === u.uid ? null : u.uid));
+            })
+          }
+        />
+        <PlayerBar seat={seats[bottom]} side={bottom} player={me} isTurn={myTurn} hits={damageOn(bottom, "leader")} fxId={fx.id}>
+          <button
+            type="button"
+            disabled={!myTurn}
+            onClick={tryEnd}
+            className={`pressable relative inline-flex min-h-14 items-center rounded-button border-b-4 px-5 text-lg font-bold disabled:opacity-40 ${
+              onlyEnd ? "animate-pulse border-green-dark bg-green text-paper" : "border-line bg-paper text-blue-ink"
+            }`}
+          >
+            차례 끝 →
+            {hint?.kind === "end" ? <Pointer /> : null}
+          </button>
+        </PlayerBar>
+      </div>
+
+      <div className={compact ? "sticky top-2 flex flex-col gap-2" : "flex flex-col gap-3"}>
+        <div
+          ref={handRef}
+          className={compact ? "grid max-h-[calc(100dvh-120px)] grid-cols-2 content-start gap-1.5 overflow-y-auto rounded-card bg-paper-dim p-1.5" : "flex gap-2 overflow-x-auto pb-2 pt-1"}
+          aria-label="내 손패"
+        >
+          {me.hand.map((c, i) => {
+            const playable = myTurn && !checkAction(s, { type: "play", handIndex: i });
+            const dragging = drag?.kind === "hand" && drag.index === i;
+            return (
+              <button
+                key={`${c.id}-${i}`}
+                type="button"
+                data-hand={i}
+                aria-label={`${c.name} 내기 (비용 ${c.cost}, 공격 ${c.attack}, 체력 ${c.health})`}
+                onPointerDown={playable ? (e) => onDragStart(e, { kind: "hand", index: i, card: c, sx: e.clientX, sy: e.clientY }) : undefined}
+                onDragStart={(e) => e.preventDefault()}
+                onClick={() =>
+                  guarded(() => {
+                    setSelected(null);
+                    void act({ type: "play", handIndex: i });
+                  })
+                }
+                className={`battle-anim relative shrink-0 rounded-[18px] p-0.5 transition-transform [animation:card-in_.35s_ease-out] ${playable ? "-translate-y-1 touch-none bg-green" : ""} ${dragging ? "opacity-30" : ""}`}
+              >
+                <BattleCard card={c} dim={myTurn && !playable} size={compact ? "sm" : "md"} />
+                {hint?.kind === "hand" && hint.index === i ? <Pointer label="눌러서 내요" /> : null}
+              </button>
+            );
+          })}
+          {me.hand.length === 0 ? <p className="py-6 text-[15px] font-bold text-muted">손에 든 카드가 없어요</p> : null}
+        </div>
+        <p className="text-center text-[13px] font-bold text-muted">
+          남은 덱 {me.deck.length}장 · 필드 {me.board.length}/{BOARD_MAX}
         </p>
-        <button
-          type="button"
-          onClick={() => {
-            setMuted(!muted);
-            setMutedState(!muted);
-            if (muted) playSound("tap");
-          }}
-          aria-label={muted ? "소리 켜기" : "소리 끄기"}
-          aria-pressed={!muted}
-          className="sticker pressable size-11 shrink-0 rounded-full bg-paper text-xl"
-        >
-          {muted ? "🔇" : "🔊"}
-        </button>
       </div>
-
-      <Board
-        label="내 필드"
-        empty={drag?.kind === "hand" ? "여기에 놓아요!" : "내 필드 (카드를 내면 여기로)"}
-        dropzone
-        glow={drag?.kind === "hand" && drag.hot}
-        units={me.board}
-        fxId={fx.id}
-        damageOn={(uid) => damageOn(bottom, uid)}
-        isSelected={(uid) => selected === uid || (drag?.kind === "unit" && drag.uid === uid)}
-        isReady={(u) => myTurn && u.ready}
-        pointerUid={hint?.kind === "unit" ? hint.uid : null}
-        playedUid={playedNow?.side === bottom ? playedNow.uid : null}
-        dragHandlers={(u) =>
-          myTurn && u.ready
-            ? {
-                onPointerDown: (e) => {
-                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  onDragStart(e, { kind: "unit", uid: u.uid, sx: e.clientX, sy: e.clientY, fx: r.left + r.width / 2, fy: r.top + r.height / 2 });
-                },
-              }
-            : null
-        }
-        onTap={(u) =>
-          guarded(() => {
-            if (!myTurn) return;
-            if (!u.ready) {
-              setNotice(`${u.card.name}은(는) 다음 차례에 공격할 수 있어요.`);
-              return;
-            }
-            setNotice(undefined);
-            playSound("tap");
-            setSelected((cur) => (cur === u.uid ? null : u.uid));
-          })
-        }
-      />
-      <PlayerBar seat={seats[bottom]} side={bottom} player={me} isTurn={myTurn} hits={damageOn(bottom, "leader")} fxId={fx.id}>
-        <button
-          type="button"
-          disabled={!myTurn}
-          onClick={tryEnd}
-          className={`pressable relative inline-flex min-h-14 items-center rounded-button border-b-4 px-5 text-lg font-bold disabled:opacity-40 ${
-            onlyEnd ? "animate-pulse border-green-dark bg-green text-paper" : "border-line bg-paper text-blue-ink"
-          }`}
-        >
-          차례 끝 →
-          {hint?.kind === "end" ? <Pointer /> : null}
-        </button>
-      </PlayerBar>
-
-      <div ref={handRef} className="flex gap-2 overflow-x-auto pb-2 pt-1" aria-label="내 손패">
-        {me.hand.map((c, i) => {
-          const playable = myTurn && !checkAction(s, { type: "play", handIndex: i });
-          const dragging = drag?.kind === "hand" && drag.index === i;
-          return (
-            <button
-              key={`${c.id}-${i}`}
-              type="button"
-              data-hand={i}
-              aria-label={`${c.name} 내기 (비용 ${c.cost}, 공격 ${c.attack}, 체력 ${c.health})`}
-              onPointerDown={playable ? (e) => onDragStart(e, { kind: "hand", index: i, card: c, sx: e.clientX, sy: e.clientY }) : undefined}
-              onDragStart={(e) => e.preventDefault()}
-              onClick={() =>
-                guarded(() => {
-                  setSelected(null);
-                  void act({ type: "play", handIndex: i });
-                })
-              }
-              className={`battle-anim relative shrink-0 rounded-[18px] p-0.5 transition-transform [animation:card-in_.35s_ease-out] ${playable ? "-translate-y-1 touch-none bg-green" : ""} ${dragging ? "opacity-30" : ""}`}
-            >
-              <BattleCard card={c} dim={myTurn && !playable} />
-              {hint?.kind === "hand" && hint.index === i ? <Pointer label="눌러서 내요" /> : null}
-            </button>
-          );
-        })}
-        {me.hand.length === 0 ? <p className="py-6 text-[15px] font-bold text-muted">손에 든 카드가 없어요</p> : null}
-      </div>
-      <p className="text-center text-[13px] font-bold text-muted">
-        남은 덱 {me.deck.length}장 · 필드 {me.board.length}/{BOARD_MAX}
-      </p>
 
       {/* 끌고 있는 카드 / 공격 화살표 */}
       {drag?.active && drag.kind === "hand" ? (
@@ -662,6 +698,7 @@ function PlayerBar({
 }
 
 function Board({
+  compact = false,
   label,
   empty,
   dropzone = false,
@@ -677,6 +714,7 @@ function Board({
   isReady = () => false,
   pointerUid = null,
 }: {
+  compact?: boolean;
   label: string;
   empty?: string;
   /** 손패 카드를 끌어다 놓는 곳 */
@@ -697,7 +735,7 @@ function Board({
 }) {
   return (
     <div
-      className={`flex min-h-[196px] items-center justify-center gap-2 rounded-card border-2 border-dashed px-2 py-2 transition-colors ${glow ? "border-green bg-green-soft" : "border-line"}`}
+      className={`flex ${compact ? "min-h-[156px]" : "min-h-[196px]"} items-center justify-center gap-2 rounded-card border-2 border-dashed px-2 py-2 transition-colors ${glow ? "border-green bg-green-soft" : "border-line"}`}
       aria-label={label}
       data-dropzone={dropzone ? "board" : undefined}
     >
@@ -723,7 +761,7 @@ function Board({
             }`}
           >
             <span key={hits.length ? `hit-${fxId}` : "still"} className={`battle-anim block ${hits.length ? "[animation:hit-shake_.4s]" : ""}`}>
-              <BattleCard card={u.card} attack={u.attack} health={u.health} maxHealth={u.maxHealth} showCost={false} />
+              <BattleCard card={u.card} attack={u.attack} health={u.health} maxHealth={u.maxHealth} showCost={false} size={compact ? "sm" : "md"} />
             </span>
             {pointerUid === u.uid ? <Pointer label={target ? "눌러서 공격해요" : "공격할 카드로 골라요"} /> : null}
             {playedUid === u.uid && u.card.ability ? <AbilityBurst key={`ab-${fxId}`} ability={u.card.ability} /> : null}
