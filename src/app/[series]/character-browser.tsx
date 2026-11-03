@@ -10,8 +10,7 @@ import { CharacterCard, CharacterCardSkeleton } from "@/components/card/Characte
 import {
   browseParsers,
   charactersQueryKey,
-  ROLE_LABEL,
-  type RoleKey,
+  STAT_KEYS,
   type SortKey,
   type StatLabels,
 } from "@/lib/characters/browse";
@@ -20,10 +19,10 @@ type Props = {
   seriesSlug: string;
   statLabels: StatLabels;
   factions: { name: string; color: string | null }[];
-  roles: RoleKey[];
+  kinds: string[];
 };
 
-export function CharacterBrowser({ seriesSlug, statLabels, factions, roles }: Props) {
+export function CharacterBrowser({ seriesSlug, statLabels, factions, kinds }: Props) {
   const [filters, setFilters] = useQueryStates(browseParsers);
   // 칩과 정렬은 브라우저 기록에 남겨 뒤로 가기로 되돌릴 수 있게 하고,
   // 검색어는 글자마다 기록이 쌓이지 않도록 덮어씁니다.
@@ -43,10 +42,7 @@ export function CharacterBrowser({ seriesSlug, statLabels, factions, roles }: Pr
 
   const sortOptions: { value: SortKey; label: string }[] = [
     { value: "name", label: "이름순" },
-    { value: "power", label: `${statLabels.power} 높은 순` },
-    { value: "intellect", label: `${statLabels.intellect} 높은 순` },
-    { value: "leadership", label: `${statLabels.leadership} 높은 순` },
-    { value: "charm", label: `${statLabels.charm} 높은 순` },
+    ...STAT_KEYS.map((k) => ({ value: k, label: `${statLabels[k]} 높은 순` })),
   ];
 
   return (
@@ -82,14 +78,14 @@ export function CharacterBrowser({ seriesSlug, statLabels, factions, roles }: Pr
           ))}
         </ChipRow>
 
-        {roles.length > 1 ? (
+        {kinds.length > 1 ? (
           <ChipRow label="종류">
-            <Chip pressed={!filters.role} onClick={() => pick({ role: null })}>
+            <Chip pressed={!filters.kind} onClick={() => pick({ kind: null })}>
               전체
             </Chip>
-            {roles.map((r) => (
-              <Chip key={r} pressed={filters.role === r} onClick={() => pick({ role: r })}>
-                {ROLE_LABEL[r]}
+            {kinds.map((k) => (
+              <Chip key={k} pressed={filters.kind === k} onClick={() => pick({ kind: k })}>
+                {k}
               </Chip>
             ))}
           </ChipRow>

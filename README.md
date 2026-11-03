@@ -9,7 +9,7 @@
 
 - Next.js 16 (App Router, Cache Components)
 - Prisma 7 + `@prisma/adapter-pg` (node-postgres)
-- Neon Postgres (`neon.ts`로 서비스 선언)
+- Neon Postgres + Neon Auth (Managed Better Auth) — `neon.ts`로 서비스 선언
 - Tailwind CSS v4
 
 ## 처음 세팅하기
@@ -18,11 +18,14 @@
 npm install
 npm i -g neon@latest
 neon login
-neon deploy          # neon.ts 적용 + .env.local에 DATABASE_URL / DATABASE_URL_UNPOOLED 생성
+neon deploy          # neon.ts 적용 + .env.local에 DATABASE_URL(_UNPOOLED), NEON_AUTH_BASE_URL 생성
+echo "NEON_AUTH_COOKIE_SECRET=$(openssl rand -base64 32)" >> .env.local   # 세션 쿠키 키 (처음 한 번)
 npm run db:migrate   # prisma/migrations 적용 (직접 연결 URL 사용)
-npm run db:seed      # 예시 데이터 (삼국지 3명)
+npm run db:seed      # 예시 데이터 (삼국지 20명, 그리스신화 14명)
 npm run dev
 ```
+
+처음 접속하면 로그인 화면이 나옵니다. 부모님 계정으로 가입 → 아이 프로필과 부모 PIN 설정 → 아이 아바타를 고르면 도감이 열립니다.
 
 연결이 잘 되는지 확인하려면 개발 서버를 띄운 뒤 http://localhost:3000/api/health/db 를 열어 보세요. `ok: true`와 인물 수가 보이면 성공입니다.
 
@@ -53,3 +56,24 @@ DATABASE_DRIVER=neon-http npm run start
 | `npm run db:migrate:dev` | 스키마 변경 후 새 마이그레이션 만들기 |
 | `npm run db:seed` | 시드 데이터 넣기 |
 | `npm run db:studio` | Prisma Studio |
+
+## 로그인과 가족
+
+| 화면 | 설명 |
+|---|---|
+| `/auth/sign-in`, `/auth/sign-up` | 부모님 계정 (Neon Auth 이메일·비밀번호) |
+| `/setup` | 처음 한 번: 아이 프로필(1~4명)과 부모 PIN |
+| `/me` | 누가 볼지 고르기 (아바타를 누르면 바로 입장) |
+| `/parent` | 부모 모드 (PIN 확인 후 10분): 프로필 관리, 로그아웃 |
+
+- 모든 화면은 로그인이 필요합니다 (`src/proxy.ts`). 예외: 로그인·가입 화면, `/api/auth`, `/api/health`.
+- 서버 액션과 데이터 조회는 `src/lib/family/viewer.ts`로 세션과 가족을 다시 확인합니다.
+- 가족 데이터 공개 범위는 `src/lib/queries/visibility.ts` 한 곳에서 정합니다 (공식 데이터 + 우리 가족 데이터).
+
+## 로컬 Postgres로 테스트하기
+
+Neon 대신 로컬 Postgres에 마이그레이션과 시드를 적용해 기본(pg) 드라이버로 확인할 수 있습니다. 로그인은 여전히 Neon Auth를 씁니다.
+
+```bash
+DATABASE_URL=postgresql://postgres@127.0.0.1:5432/hero DATABASE_URL_UNPOOLED=postgresql://postgres@127.0.0.1:5432/hero npm run db:migrate
+```

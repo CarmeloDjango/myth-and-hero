@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { SiteFooter, SiteHeader } from "@/components/layout/SiteChrome";
+import { requireProfile } from "@/lib/family/viewer";
 import { getSeriesList } from "@/lib/queries/characters";
 
 /** 세계관 카드 위쪽 그림 영역 색 (테마 색이 없을 때) */
@@ -14,10 +15,12 @@ const SERIES_TINT: Record<string, string> = {
 
 async function SeriesGrid() {
   await connection();
+  // 로그인 → 가족 설정 → 프로필 고르기를 마치지 않았으면 그 화면으로 보냅니다.
+  const viewer = await requireProfile();
 
   let list: Awaited<ReturnType<typeof getSeriesList>>;
   try {
-    list = await getSeriesList();
+    list = await getSeriesList(viewer.family.id);
   } catch (error) {
     console.error("[home] 세계관 조회 실패", error);
     return (

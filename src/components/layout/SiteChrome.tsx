@@ -1,4 +1,8 @@
+import { Suspense } from "react";
 import Link from "next/link";
+
+import { ProfileAvatar } from "@/components/family/ProfileAvatar";
+import { getViewer } from "@/lib/family/viewer";
 
 export function SiteHeader() {
   return (
@@ -10,16 +14,46 @@ export function SiteHeader() {
         <Link href="/" className="font-display text-[34px] text-green-dark">
           영웅 도감
         </Link>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/"
             className="sticker pressable inline-flex min-h-12 items-center rounded-button px-4 text-[15px] font-bold tracking-[0.053em] text-muted hover:bg-paper-dim"
           >
             세계관
           </Link>
+          {/* 누가 보고 있는지는 요청마다 달라서 Suspense 안에서 읽습니다. */}
+          <Suspense fallback={<span className="inline-block h-12 w-28" />}>
+            <ViewerBadge />
+          </Suspense>
         </div>
       </nav>
     </header>
+  );
+}
+
+async function ViewerBadge() {
+  const viewer = await getViewer();
+  if (!viewer?.family) return null;
+
+  return (
+    <>
+      {viewer.profile ? (
+        <Link
+          href="/me"
+          aria-label={`${viewer.profile.nickname}(으)로 보는 중. 다른 사람으로 바꾸기`}
+          className="sticker pressable inline-flex min-h-12 items-center gap-2 rounded-button py-1 pl-1.5 pr-4 text-[15px] font-bold hover:bg-paper-dim"
+        >
+          <ProfileAvatar nickname={viewer.profile.nickname} avatar={viewer.profile.avatar} size={36} />
+          {viewer.profile.nickname}
+        </Link>
+      ) : null}
+      <Link
+        href="/parent"
+        className="sticker pressable inline-flex min-h-12 items-center rounded-button px-4 text-[15px] font-bold tracking-[0.053em] text-muted hover:bg-paper-dim"
+      >
+        부모
+      </Link>
+    </>
   );
 }
 

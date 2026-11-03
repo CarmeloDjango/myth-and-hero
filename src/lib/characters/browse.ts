@@ -12,37 +12,19 @@ import { z } from "zod";
 
 export const PAGE_SIZE = 12;
 
-export const SORT_KEYS = ["name", "power", "intellect", "leadership", "charm"] as const;
+/** 능력치 5칸. 화면에 보이는 이름은 세계관의 statLabels에서 가져옵니다. */
+export const STAT_KEYS = ["stat1", "stat2", "stat3", "stat4", "stat5"] as const;
+export type StatKey = (typeof STAT_KEYS)[number];
+export type StatLabels = Record<StatKey, string>;
+
+export const SORT_KEYS = ["name", ...STAT_KEYS] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 
-export const ROLE_KEYS = [
-  "GOD",
-  "HERO",
-  "MONSTER",
-  "GENERAL",
-  "STRATEGIST",
-  "RULER",
-  "OUTLAW",
-  "OTHER",
-] as const;
-export type RoleKey = (typeof ROLE_KEYS)[number];
-
-export const ROLE_LABEL: Record<RoleKey, string> = {
-  GOD: "신",
-  HERO: "영웅",
-  MONSTER: "괴물",
-  GENERAL: "장수",
-  STRATEGIST: "책사",
-  RULER: "군주",
-  OUTLAW: "호걸",
-  OTHER: "기타",
-};
-
-/** URL 파라미터: ?q=관&faction=촉&role=GENERAL&sort=power */
+/** URL 파라미터: ?q=관&faction=촉&kind=장수&sort=stat2 */
 export const browseParsers = {
   q: parseAsString.withDefault(""),
   faction: parseAsString.withDefault(""),
-  role: parseAsStringLiteral(ROLE_KEYS),
+  kind: parseAsString.withDefault(""),
   sort: parseAsStringLiteral(SORT_KEYS).withDefault("name"),
 };
 
@@ -51,12 +33,12 @@ export const loadBrowseParams = createLoader(browseParsers);
 export type BrowseFilters = {
   q: string;
   faction: string;
-  role: RoleKey | null;
+  kind: string;
   sort: SortKey;
 };
 
 export function normalizeFilters(f: BrowseFilters): BrowseFilters {
-  return { q: f.q.trim(), faction: f.faction, role: f.role, sort: f.sort };
+  return { q: f.q.trim(), faction: f.faction, kind: f.kind, sort: f.sort };
 }
 
 export const charactersQueryKey = (seriesSlug: string, filters: BrowseFilters) =>
@@ -66,45 +48,43 @@ export const characterPageInput = z.object({
   seriesSlug: z.string().min(1).max(64),
   q: z.string().max(40).default(""),
   faction: z.string().max(40).default(""),
-  role: z.enum(ROLE_KEYS).nullable().default(null),
+  kind: z.string().max(40).default(""),
   sort: z.enum(SORT_KEYS).default("name"),
   cursor: z.string().max(64).nullable().default(null),
 });
 export type CharacterPageInput = z.input<typeof characterPageInput>;
 
-export type StatLabels = {
-  leadership: string;
-  power: string;
-  intellect: string;
-  politics: string;
-  charm: string;
-};
-
 export const DEFAULT_STAT_LABELS: StatLabels = {
-  leadership: "통솔",
-  power: "무력",
-  intellect: "지력",
-  politics: "정치",
-  charm: "매력",
+  stat1: "능력1",
+  stat2: "능력2",
+  stat3: "능력3",
+  stat4: "능력4",
+  stat5: "능력5",
 };
 
 export function toStatLabels(raw: unknown): StatLabels {
   const r = (raw && typeof raw === "object" ? raw : {}) as Partial<StatLabels>;
-  return { ...DEFAULT_STAT_LABELS, ...r };
+  const out = { ...DEFAULT_STAT_LABELS };
+  for (const k of STAT_KEYS) {
+    if (typeof r[k] === "string" && r[k]) out[k] = r[k];
+  }
+  return out;
 }
 
-/** 카드 한 장에 필요한 데이터 (서버 → 클라이언트) */
+/** 카드 한 장에 필요한 데이터 (서버 → 클라이언트). 카드에는 능력치 1~3칸을 보여줍니다. */
 export type CharacterCardData = {
   slug: string;
   name: string;
   originalName: string | null;
   title: string | null;
   rarity: number;
-  power: number;
-  intellect: number;
-  leadership: number;
+  stat1: number;
+  stat2: number;
+  stat3: number;
   faction: { name: string; color: string | null } | null;
-  roleLabel: string;
+  kindName: string | null;
+  /** 아이가 만든 카드("나만의 카드")인지 */
+  isFamily: boolean;
 };
 
 export type CharacterPage = {

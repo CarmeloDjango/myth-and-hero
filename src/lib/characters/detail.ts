@@ -1,7 +1,9 @@
 /**
  * 인물 상세 화면 공용 타입과 라벨 (서버·클라이언트 공용)
  */
-import type { StatLabels } from "./browse";
+import { STAT_KEYS, type StatKey, type StatLabels } from "./browse";
+
+export type { StatKey };
 
 export type RelationTypeKey =
   | "PARENT"
@@ -46,16 +48,15 @@ export const RELATION_BACKWARD: Record<RelationTypeKey, string> = {
 /** 친구 쪽 관계는 초록, 라이벌은 주황으로 구분합니다. */
 export const RIVAL_TYPES: ReadonlySet<RelationTypeKey> = new Set(["RIVAL"]);
 
-export type StatKey = keyof StatLabels;
-export const STAT_ORDER: StatKey[] = ["leadership", "power", "intellect", "politics", "charm"];
+export const STAT_ORDER: readonly StatKey[] = STAT_KEYS;
 
-/** 능력치 막대 색 (docs/DESIGN.md 2장) */
+/** 능력치 막대 색: 칸 순서대로 (docs/DESIGN.md 2장) */
 export const STAT_COLOR: Record<StatKey, string> = {
-  leadership: "var(--color-blue)",
-  power: "var(--color-orange)",
-  intellect: "var(--color-purple)",
-  politics: "var(--color-green)",
-  charm: "var(--color-pink)",
+  stat1: "var(--color-blue)",
+  stat2: "var(--color-orange)",
+  stat3: "var(--color-purple)",
+  stat4: "var(--color-green)",
+  stat5: "var(--color-pink)",
 };
 
 export type RelatedCharacter = {
@@ -74,13 +75,15 @@ export type CharacterDetail = {
   title: string | null;
   aliases: string[];
   rarity: number;
-  roleLabel: string;
+  kindName: string | null;
   era: string | null;
   summary: string;
   biography: string;
   funFacts: string[];
   stats: Record<StatKey, number>;
   faction: { name: string; color: string | null } | null;
+  /** 아이가 만든 카드("나만의 카드")인지 */
+  isFamily: boolean;
   series: { slug: string; name: string; statLabels: StatLabels };
   related: RelatedCharacter[];
   prev: { slug: string; name: string } | null;

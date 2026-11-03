@@ -15,13 +15,15 @@ import {
   loadBrowseParams,
   type CharacterPage,
 } from "@/lib/characters/browse";
+import { getViewer, requireProfile } from "@/lib/family/viewer";
 import { getCharacterPage, getSeriesForBrowse } from "@/lib/queries/characters";
 
 import { CharacterBrowser } from "./character-browser";
 
 export async function generateMetadata({ params }: PageProps<"/[series]">): Promise<Metadata> {
   const { series } = await params;
-  const info = await getSeriesForBrowse(series);
+  const viewer = await getViewer();
+  const info = viewer?.family ? await getSeriesForBrowse(viewer.family.id, decodeURIComponent(series)) : null;
   return { title: info ? `${info.name} 도감 · 영웅 도감` : "영웅 도감" };
 }
 
@@ -47,8 +49,10 @@ async function SeriesBrowse({
   searchParams,
 }: Pick<PageProps<"/[series]">, "params" | "searchParams">) {
   const { series: slug } = await params;
+  const viewer = await requireProfile();
+  const familyId = viewer.family.id;
   const [series, filters] = await Promise.all([
-    getSeriesForBrowse(decodeURIComponent(slug)),
+    getSeriesForBrowse(familyId, decodeURIComponent(slug)),
     loadBrowseParams(searchParams),
   ]);
   if (!series) notFound();
@@ -57,7 +61,7 @@ async function SeriesBrowse({
   const queryClient = new QueryClient();
   await queryClient.prefetchInfiniteQuery({
     queryKey: charactersQueryKey(series.slug, filters),
-    queryFn: () => getCharacterPage({ seriesSlug: series.slug, ...filters, cursor: null }),
+    queryFn: () => getCharacterPage(familyId, { seriesSlug: series.slug, ...filters, cursor: null }),
     initialPageParam: null as string | null,
   });
   const first = queryClient.getQueryData<InfiniteData<CharacterPage>>(
@@ -78,7 +82,7 @@ async function SeriesBrowse({
           seriesSlug={series.slug}
           statLabels={series.statLabels}
           factions={series.factions}
-          roles={series.roles}
+          kinds={series.kinds}
         />
       </HydrationBoundary>
     </>

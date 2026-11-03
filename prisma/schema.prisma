@@ -1,5 +1,9 @@
-// 영웅 도감 데이터 모델 (docs/PLAN.md 3장)
+// 영웅 도감 데이터 모델 (docs/PLAN.md 3장, docs/HERO_MAKER.md 6장)
 // 런타임 연결은 src/lib/db.ts(드라이버 어댑터), 마이그레이션 연결은 prisma.config.ts에서 설정합니다.
+//
+// 공식 데이터 vs 가족 데이터
+// - familyId가 null이면 공식 세계관/인물(모든 가족이 봄)
+// - familyId가 있으면 그 가족만 봄 (src/lib/queries/visibility.ts의 공통 조건으로만 조회)
 
 generator client {
   provider = "prisma-client"
@@ -10,22 +14,61 @@ datasource db {
   provider = "postgresql"
 }
 
-/// 세계관: 그리스신화, 삼국지, 수호지, 초한지 …
+/// 가족: 부모 계정(Neon Auth 사용자) 하나가 가족 하나를 가집니다.
+model Family {
+  id            String         @id @default(cuid())
+  /// neon_auth 사용자 id
+  ownerId       String         @unique
+  /// 부모 모드 PIN (scrypt 해시)
+  parentPinHash String
+  createdAt     DateTime       @default(now())
+  profiles      ChildProfile[]
+  series        Series[]
+  characters    Character[]
+}
+
+/// 아이 프로필: 별명과 아바타만 저장합니다 (개인정보 없음).
+model ChildProfile {
+  id         String      @id @default(cuid())
+  familyId   String
+  family     Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  nickname   String
+  /// 미리 준비된 아바타 키 (src/lib/family/avatars.ts)
+  avatar     String
+  order      Int         @default(0)
+  createdAt  DateTime    @default(now())
+  characters Character[] @relation("creator")
+  series     Series[]    @relation("seriesCreator")
+
+  @@index([familyId, order])
+}
+
+/// 세계관: 그리스신화, 삼국지, 수호지, 초한지 … + 가족이 만든 세계관
 model Series {
-  id          String      @id @default(cuid())
-  slug        String      @unique
+  id          String          @id @default(cuid())
+  slug        String          @unique
   name        String
   description String
   coverImage  String?
   themeColor  String?
-  /// 능력치 라벨: {"leadership":"통솔","power":"무력","intellect":"지력","politics":"정치","charm":"매력"}
+  /// 능력치 라벨: {"stat1":"통솔","stat2":"무력","stat3":"지력","stat4":"정치","stat5":"매력"}
   statLabels  Json
-  order       Int         @default(0)
+  order       Int             @default(0)
+  /// null이면 공식 세계관
+  familyId    String?
+  family      Family?         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  creatorId   String?
+  creator     ChildProfile?   @relation("seriesCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  /// 꾸미기 기본 파츠 팩
+  partsPack   String          @default("general")
   factions    Faction[]
+  kinds       CharacterKind[]
   characters  Character[]
+
+  @@index([familyId, order])
 }
 
-/// 진영/소속: 촉·위·오, 올림포스 12신, 양산박 …
+/// 진영/소속: 촉·위·오, 올림포스, 양산박 …
 model Faction {
   id         String      @id @default(cuid())
   seriesId   String
@@ -39,24 +82,32 @@ model Faction {
   @@unique([seriesId, name])
 }
 
-enum Role {
-  GOD
-  HERO
-  MONSTER
-  GENERAL
-  STRATEGIST
-  RULER
-  OUTLAW
-  OTHER
+/// 세계관별 종류: 장수/책사/군주, 신/영웅/괴물, 티니핑/로열 티니핑 …
+model CharacterKind {
+  id         String      @id @default(cuid())
+  seriesId   String
+  series     Series      @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  name       String
+  order      Int         @default(0)
+  characters Character[]
+
+  @@unique([seriesId, name])
+}
+
+enum CreationStatus {
+  DRAFT
+  DONE
 }
 
 model Character {
-  id           String   @id @default(cuid())
-  slug         String   @unique
+  id           String         @id @default(cuid())
+  slug         String         @unique
   seriesId     String
-  series       Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  series       Series         @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   factionId    String?
-  faction      Faction? @relation(fields: [factionId], references: [id], onDelete: SetNull)
+  faction      Faction?       @relation(fields: [factionId], references: [id], onDelete: SetNull)
+  kindId       String?
+  kind         CharacterKind? @relation(fields: [kindId], references: [id], onDelete: SetNull)
 
   name         String
   originalName String?
@@ -67,38 +118,54 @@ model Character {
   /// 초성 (서버에서 생성)
   choseong     String
 
-  role         Role
   /// 1~5성
-  rarity       Int      @default(1)
-  leadership   Int      @default(0)
-  power        Int      @default(0)
-  intellect    Int      @default(0)
-  politics     Int      @default(0)
-  charm        Int      @default(0)
+  rarity       Int            @default(1)
+  /// 능력치 5칸. 이름은 Series.statLabels에서 가져옵니다.
+  stat1        Int            @default(0)
+  stat2        Int            @default(0)
+  stat3        Int            @default(0)
+  stat4        Int            @default(0)
+  stat5        Int            @default(0)
 
   summary      String
-  /// 인물 열전 (마크다운)
+  /// 인물 열전 (빈 줄로 문단 구분)
   biography    String
   funFacts     String[]
   imageUrl     String?
   thumbUrl     String?
   era          String?
 
+  /// null이면 공식 인물
+  familyId     String?
+  family       Family?        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  creatorId    String?
+  creator      ChildProfile?  @relation("creator", fields: [creatorId], references: [id], onDelete: SetNull)
+  status       CreationStatus @default(DONE)
+  /// 영웅 마법사에서 이어서 만들기용
+  wizardStep   Int            @default(0)
+  /// 부모가 숨김
+  hidden       Boolean        @default(false)
+  /// 꾸미기 파츠 조합
+  avatarParts  Json?
+  /// 그리기 획 데이터 JSON (Object Storage)
+  strokesUrl   String?
+
   tags          CharacterTag[]
   relationsFrom Relation[]     @relation("from")
   relationsTo   Relation[]     @relation("to")
 
-  published    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  published    Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
-  @@index([seriesId, factionId, role])
+  @@index([seriesId, factionId, kindId])
   @@index([seriesId, name, id])
-  @@index([seriesId, leadership(sort: Desc), id])
-  @@index([seriesId, power(sort: Desc), id])
-  @@index([seriesId, intellect(sort: Desc), id])
-  @@index([seriesId, politics(sort: Desc), id])
-  @@index([seriesId, charm(sort: Desc), id])
+  @@index([seriesId, stat1(sort: Desc), id])
+  @@index([seriesId, stat2(sort: Desc), id])
+  @@index([seriesId, stat3(sort: Desc), id])
+  @@index([seriesId, stat4(sort: Desc), id])
+  @@index([seriesId, stat5(sort: Desc), id])
+  @@index([familyId, creatorId, status, updatedAt])
   /// 부분 일치 검색(ILIKE '%관%')용 trigram 인덱스. pg_trgm 확장이 필요합니다(마이그레이션에서 생성).
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "Character_searchText_trgm_idx")
   @@index([choseong(ops: raw("gin_trgm_ops"))], type: Gin, map: "Character_choseong_trgm_idx")
@@ -132,6 +199,7 @@ enum RelationType {
   MENTOR
 }
 
+/// Relation(from, to, type): "to는 from의 type"
 model Relation {
   id     String       @id @default(cuid())
   fromId String

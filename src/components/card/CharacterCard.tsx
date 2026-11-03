@@ -13,10 +13,11 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
   const tint = c.faction?.color ?? "#f7f7f7";
   const factionText = FACTION_TEXT[tint.toLowerCase()] ?? "#4b4b4b";
   const glyph = cardGlyph(c.name, c.originalName);
+  // 카드에는 능력치 1~3칸을 보여줍니다 (색은 상세 화면과 같은 칸 순서).
   const stats = [
-    { label: labels.power, value: c.power, color: "var(--color-orange)" },
-    { label: labels.intellect, value: c.intellect, color: "var(--color-purple)" },
-    { label: labels.leadership, value: c.leadership, color: "var(--color-blue)" },
+    { label: labels.stat1, value: c.stat1, color: "var(--color-blue)" },
+    { label: labels.stat2, value: c.stat2, color: "var(--color-orange)" },
+    { label: labels.stat3, value: c.stat3, color: "var(--color-purple)" },
   ];
 
   return (
@@ -31,14 +32,20 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
         >
           {"★".repeat(c.rarity)}
         </span>
-        <span className="absolute bottom-2.5 left-3 rounded-button bg-paper px-2 py-0.5 text-[11px] font-bold text-muted">
-          일러스트 자리
-        </span>
+        {c.isFamily ? (
+          <span className="absolute bottom-2.5 left-3 rounded-button border-2 border-green bg-paper px-2 py-0.5 text-[11px] font-bold text-green-ink">
+            나만의 카드
+          </span>
+        ) : (
+          <span className="absolute bottom-2.5 left-3 rounded-button bg-paper px-2 py-0.5 text-[11px] font-bold text-muted">
+            일러스트 자리
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col gap-0.5 px-[18px] pb-1 pt-4">
         <span className="text-[13px] font-bold tracking-[0.053em]" style={{ color: factionText }}>
-          {c.faction?.name ?? "무소속"} · {c.roleLabel}
+          {[c.faction?.name ?? "무소속", c.kindName].filter(Boolean).join(" · ")}
         </span>
         <h3 className="font-display text-4xl leading-tight">{c.name}</h3>
         {c.title ? <p className="text-[15px] font-medium text-muted">{c.title}</p> : null}

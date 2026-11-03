@@ -4,7 +4,6 @@ import type { Prisma } from "@/generated/prisma/client";
 import {
   characterPageInput,
   PAGE_SIZE,
-  ROLE_LABEL,
   toStatLabels,
   type CharacterPage,
   type CharacterPageInput,
@@ -20,12 +19,15 @@ import {
 import { getDb } from "@/lib/db";
 import { isChoseongOnly } from "@/lib/search/choseong";
 
+import { visibleCharacterWhere, visibleSeriesWhere } from "./visibility";
+
 const ORDER_BY: Record<SortKey, Prisma.CharacterOrderByWithRelationInput[]> = {
   name: [{ name: "asc" }, { id: "asc" }],
-  power: [{ power: "desc" }, { id: "asc" }],
-  intellect: [{ intellect: "desc" }, { id: "asc" }],
-  leadership: [{ leadership: "desc" }, { id: "asc" }],
-  charm: [{ charm: "desc" }, { id: "asc" }],
+  stat1: [{ stat1: "desc" }, { id: "asc" }],
+  stat2: [{ stat2: "desc" }, { id: "asc" }],
+  stat3: [{ stat3: "desc" }, { id: "asc" }],
+  stat4: [{ stat4: "desc" }, { id: "asc" }],
+  stat5: [{ stat5: "desc" }, { id: "asc" }],
 };
 
 function buildSearchWhere(q: string): Prisma.CharacterWhereInput {
@@ -41,16 +43,21 @@ function buildSearchWhere(q: string): Prisma.CharacterWhereInput {
  * 도감 목록 한 페이지 (커서 방식)
  * 정렬 기준 + id로 순서를 고정하므로, 스크롤 중에 데이터가 추가돼도 중복이나 누락이 없습니다.
  */
-export async function getCharacterPage(raw: CharacterPageInput): Promise<CharacterPage> {
+export async function getCharacterPage(
+  familyId: string | null,
+  raw: CharacterPageInput,
+): Promise<CharacterPage> {
   const input = characterPageInput.parse(raw);
   const q = input.q.trim();
 
   const where: Prisma.CharacterWhereInput = {
-    published: true,
-    series: { slug: input.seriesSlug },
-    ...(input.faction ? { faction: { name: input.faction } } : {}),
-    ...(input.role ? { role: input.role } : {}),
-    ...(q ? buildSearchWhere(q) : {}),
+    AND: [
+      visibleCharacterWhere(familyId),
+      { series: { slug: input.seriesSlug, ...visibleSeriesWhere(familyId) } },
+      input.faction ? { faction: { name: input.faction } } : {},
+      input.kind ? { kind: { name: input.kind } } : {},
+      q ? buildSearchWhere(q) : {},
+    ],
   };
 
   const db = getDb();
@@ -67,10 +74,11 @@ export async function getCharacterPage(raw: CharacterPageInput): Promise<Charact
         originalName: true,
         title: true,
         rarity: true,
-        role: true,
-        power: true,
-        intellect: true,
-        leadership: true,
+        stat1: true,
+        stat2: true,
+        stat3: true,
+        familyId: true,
+        kind: { select: { name: true } },
         faction: { select: { name: true, color: true } },
       },
     }),
@@ -87,37 +95,32 @@ export async function getCharacterPage(raw: CharacterPageInput): Promise<Charact
       originalName: r.originalName,
       title: r.title,
       rarity: r.rarity,
-      power: r.power,
-      intellect: r.intellect,
-      leadership: r.leadership,
+      stat1: r.stat1,
+      stat2: r.stat2,
+      stat3: r.stat3,
       faction: r.faction,
-      roleLabel: ROLE_LABEL[r.role] ?? r.role,
+      kindName: r.kind?.name ?? null,
+      isFamily: r.familyId !== null,
     })),
     nextCursor: hasMore ? page[page.length - 1].id : null,
     total,
   };
 }
 
-/** 세계관 정보 + 진영 목록 + 실제로 쓰이는 역할 목록 (필터 칩용) */
-export async function getSeriesForBrowse(slug: string) {
-  const db = getDb();
-  const series = await db.series.findUnique({
-    where: { slug },
+/** 세계관 정보 + 진영 목록 + 종류 목록 (필터 칩용) */
+export async function getSeriesForBrowse(familyId: string | null, slug: string) {
+  const series = await getDb().series.findFirst({
+    where: { slug, ...visibleSeriesWhere(familyId) },
     select: {
       slug: true,
       name: true,
       description: true,
       statLabels: true,
       factions: { select: { name: true, color: true }, orderBy: { name: "asc" } },
+      kinds: { select: { name: true }, orderBy: [{ order: "asc" }, { name: "asc" }] },
     },
   });
   if (!series) return null;
-
-  const roles = await db.character.findMany({
-    where: { series: { slug }, published: true },
-    distinct: ["role"],
-    select: { role: true },
-  });
 
   return {
     slug: series.slug,
@@ -125,32 +128,39 @@ export async function getSeriesForBrowse(slug: string) {
     description: series.description,
     statLabels: toStatLabels(series.statLabels),
     factions: series.factions,
-    roles: roles.map((r) => r.role),
+    kinds: series.kinds.map((k) => k.name),
   };
 }
 
-/** 홈 화면: 공식 세계관 목록 */
-export async function getSeriesList() {
+/** 홈 화면: 볼 수 있는 세계관 목록 (공식 + 우리 가족) */
+export async function getSeriesList(familyId: string | null) {
   return getDb().series.findMany({
+    where: visibleSeriesWhere(familyId),
     orderBy: [{ order: "asc" }, { name: "asc" }],
     select: {
       slug: true,
       name: true,
       description: true,
       themeColor: true,
-      _count: { select: { characters: { where: { published: true } } } },
+      familyId: true,
+      _count: { select: { characters: { where: visibleCharacterWhere(familyId) } } },
     },
   });
 }
 
 /**
  * 인물 상세: 능력치, 열전, 관계(양방향), 이전/다음 인물(이름순)
- * 없거나 공개되지 않은 인물이면 null을 돌려줍니다.
+ * 없거나 볼 수 없는 인물이면 null을 돌려줍니다.
  */
-export async function getCharacterDetail(seriesSlug: string, slug: string): Promise<CharacterDetail | null> {
+export async function getCharacterDetail(
+  familyId: string | null,
+  seriesSlug: string,
+  slug: string,
+): Promise<CharacterDetail | null> {
   const db = getDb();
+  const visible = visibleCharacterWhere(familyId);
   const c = await db.character.findFirst({
-    where: { slug, published: true, series: { slug: seriesSlug } },
+    where: { AND: [visible, { slug, series: { slug: seriesSlug, ...visibleSeriesWhere(familyId) } }] },
     select: {
       id: true,
       slug: true,
@@ -159,17 +169,18 @@ export async function getCharacterDetail(seriesSlug: string, slug: string): Prom
       title: true,
       aliases: true,
       rarity: true,
-      role: true,
       era: true,
       summary: true,
       biography: true,
       funFacts: true,
-      leadership: true,
-      power: true,
-      intellect: true,
-      politics: true,
-      charm: true,
+      stat1: true,
+      stat2: true,
+      stat3: true,
+      stat4: true,
+      stat5: true,
       seriesId: true,
+      familyId: true,
+      kind: { select: { name: true } },
       faction: { select: { name: true, color: true } },
       series: { select: { slug: true, name: true, statLabels: true } },
     },
@@ -180,20 +191,25 @@ export async function getCharacterDetail(seriesSlug: string, slug: string): Prom
     slug: true,
     name: true,
     originalName: true,
-    published: true,
     faction: { select: { color: true } },
   } as const;
 
   const [outgoing, incoming, prev, next] = await Promise.all([
-    db.relation.findMany({ where: { fromId: c.id }, select: { type: true, to: { select: relatedSelect } } }),
-    db.relation.findMany({ where: { toId: c.id }, select: { type: true, from: { select: relatedSelect } } }),
+    db.relation.findMany({
+      where: { fromId: c.id, to: visible },
+      select: { type: true, to: { select: relatedSelect } },
+    }),
+    db.relation.findMany({
+      where: { toId: c.id, from: visible },
+      select: { type: true, from: { select: relatedSelect } },
+    }),
     db.character.findFirst({
-      where: { seriesId: c.seriesId, published: true, name: { lt: c.name } },
+      where: { AND: [visible, { seriesId: c.seriesId, name: { lt: c.name } }] },
       orderBy: [{ name: "desc" }, { id: "desc" }],
       select: { slug: true, name: true },
     }),
     db.character.findFirst({
-      where: { seriesId: c.seriesId, published: true, name: { gt: c.name } },
+      where: { AND: [visible, { seriesId: c.seriesId, name: { gt: c.name } }] },
       orderBy: [{ name: "asc" }, { id: "asc" }],
       select: { slug: true, name: true },
     }),
@@ -203,7 +219,6 @@ export async function getCharacterDetail(seriesSlug: string, slug: string): Prom
     ...outgoing.map((r) => ({ who: r.to, label: RELATION_FORWARD[r.type], type: r.type })),
     ...incoming.map((r) => ({ who: r.from, label: RELATION_BACKWARD[r.type], type: r.type })),
   ]
-    .filter((r) => r.who.published)
     // 친구 쪽 관계를 먼저, 라이벌은 뒤에
     .sort((a, b) => Number(RIVAL_TYPES.has(a.type)) - Number(RIVAL_TYPES.has(b.type)))
     .map((r) => ({
@@ -222,19 +237,14 @@ export async function getCharacterDetail(seriesSlug: string, slug: string): Prom
     title: c.title,
     aliases: c.aliases,
     rarity: c.rarity,
-    roleLabel: ROLE_LABEL[c.role] ?? c.role,
+    kindName: c.kind?.name ?? null,
     era: c.era,
     summary: c.summary,
     biography: c.biography,
     funFacts: c.funFacts,
-    stats: {
-      leadership: c.leadership,
-      power: c.power,
-      intellect: c.intellect,
-      politics: c.politics,
-      charm: c.charm,
-    },
+    stats: { stat1: c.stat1, stat2: c.stat2, stat3: c.stat3, stat4: c.stat4, stat5: c.stat5 },
     faction: c.faction,
+    isFamily: c.familyId !== null,
     series: { slug: c.series.slug, name: c.series.name, statLabels: toStatLabels(c.series.statLabels) },
     related,
     prev,

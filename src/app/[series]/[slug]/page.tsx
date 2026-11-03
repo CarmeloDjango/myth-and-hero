@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { SiteFooter, SiteHeader } from "@/components/layout/SiteChrome";
 import { cardGlyph } from "@/lib/characters/browse";
 import { STAT_COLOR, STAT_ORDER, type CharacterDetail } from "@/lib/characters/detail";
+import { getViewer, requireProfile } from "@/lib/family/viewer";
 import { getCharacterDetail } from "@/lib/queries/characters";
 
 import { CollectButton, FlipCard, ReadAloudButton } from "./detail-client";
@@ -21,7 +22,10 @@ const FACTION_TEXT: Record<string, string> = {
 
 export async function generateMetadata({ params }: PageProps<"/[series]/[slug]">): Promise<Metadata> {
   const { series, slug } = await params;
-  const c = await getCharacterDetail(decodeURIComponent(series), decodeURIComponent(slug));
+  const viewer = await getViewer();
+  const c = viewer?.family
+    ? await getCharacterDetail(viewer.family.id, decodeURIComponent(series), decodeURIComponent(slug))
+    : null;
   return c
     ? { title: `${c.name} · ${c.series.name} 도감`, description: c.summary }
     : { title: "영웅 도감" };
@@ -42,7 +46,8 @@ export default function CharacterPage({ params }: PageProps<"/[series]/[slug]">)
 }
 
 async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug: string }) {
-  const c = await getCharacterDetail(seriesSlug, slug);
+  const viewer = await requireProfile();
+  const c = await getCharacterDetail(viewer.family.id, seriesSlug, slug);
   if (!c) notFound();
 
   const labels = c.series.statLabels;
@@ -92,7 +97,7 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
                     {c.faction.name}
                   </span>
                 ) : null}
-                <Tag>{c.roleLabel}</Tag>
+                {c.kindName ? <Tag>{c.kindName}</Tag> : null}
                 {c.era ? <Tag>{c.era}</Tag> : null}
                 {c.aliases.length ? <Tag>별명 · {c.aliases.join(", ")}</Tag> : null}
               </div>

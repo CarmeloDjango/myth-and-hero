@@ -25,7 +25,7 @@ export async function GET() {
           name: true,
           title: true,
           choseong: true,
-          power: true,
+          stat1: true,
           series: { select: { name: true } },
           faction: { select: { name: true } },
         },
