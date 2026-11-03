@@ -1,3 +1,4 @@
+import { cardTint } from "@/lib/characters/browse";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -94,7 +95,7 @@ async function HeroLists() {
                     href={`/${h.series.slug}/${h.slug}`}
                     className="sticker pressable flex flex-col overflow-hidden rounded-card bg-paper transition-transform hover:-translate-y-1"
                   >
-                    <span className="relative flex aspect-square items-center justify-center" style={{ background: h.faction?.color ?? "#f7f7f7" }}>
+                    <span className="relative flex aspect-square items-center justify-center" style={{ background: cardTint(h.faction, h.kind) }}>
                       {src ? (
                         // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림
                         <img src={src} alt="" className="absolute inset-0 h-full w-full object-contain" />

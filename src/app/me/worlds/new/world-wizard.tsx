@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { createWorldAction } from "@/app/actions/worlds";
+import { checkWorldNameAction, createWorldAction } from "@/app/actions/worlds";
 import { Tori } from "@/components/mascot/Tori";
 import { ReadAloudButton } from "@/components/speech/ReadAloudButton";
 import { FormError, PrimaryButton, TextField } from "@/components/ui/form";
@@ -69,7 +69,17 @@ export function WorldWizard() {
   const next = () => {
     const p = problem();
     setError(p);
-    if (!p) setStep((s) => Math.min(STEPS.length, s + 1));
+    if (p) return;
+    if (current.key === "name") {
+      // 이미 있는 세계관 이름이면 첫 단계에서 바로 알려 줍니다.
+      start(async () => {
+        const taken = await checkWorldNameAction(name);
+        if (taken) setError(taken);
+        else setStep((s) => s + 1);
+      });
+      return;
+    }
+    setStep((s) => Math.min(STEPS.length, s + 1));
   };
 
   const addKind = (k: string) => {
@@ -81,7 +91,12 @@ export function WorldWizard() {
 
   const addFaction = () => {
     const v = factionDraft.trim();
+    if (kinds.includes(v)) {
+      setError(`"${v}"은(는) 종류 이름이에요. 편은 다른 이름으로 지어 주세요. (예: ${v} 편, ${v} 나라)`);
+      return;
+    }
     if (!v || factions.some((f) => f.name === v) || factions.length >= FACTIONS_MAX) return;
+    setError(undefined);
     setFactions((list) => [...list, { name: v.slice(0, FACTION_NAME_MAX), color: factionColor }]);
     setFactionDraft("");
     setFactionColor(FACTION_COLORS[(factions.length + 1) % FACTION_COLORS.length]);
@@ -284,7 +299,7 @@ export function WorldWizard() {
             {pending ? "만드는 중…" : "세계 만들기!"}
           </PrimaryButton>
         ) : (
-          <PrimaryButton type="button" onClick={next}>
+          <PrimaryButton type="button" onClick={next} disabled={pending}>
             다음 →
           </PrimaryButton>
         )}

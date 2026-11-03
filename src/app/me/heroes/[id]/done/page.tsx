@@ -1,3 +1,4 @@
+import { cardTint } from "@/lib/characters/browse";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -34,6 +35,7 @@ async function Done({ id }: { id: string }) {
   if (hero.status !== "DONE") redirect(`/me/heroes/${hero.id}/make`);
   const src = heroImageSrc(hero);
   const faction = hero.series.factions.find((f) => f.id === hero.factionId);
+  const tint = cardTint(faction, hero.series.kinds.find((k) => k.id === hero.kindId));
 
   return (
     <div className="flex w-full max-w-[560px] flex-col items-center gap-6 text-center">
@@ -43,7 +45,7 @@ async function Done({ id }: { id: string }) {
       </h1>
       <p className="text-xl font-medium text-muted">{hero.series.name} 도감에 &ldquo;나만의 카드&rdquo;로 들어갔어요.</p>
       <div className="sticker w-full max-w-[320px] overflow-hidden rounded-card motion-safe:animate-[pop_.5s_ease-out]">
-        <div className="relative flex aspect-square items-center justify-center" style={{ background: faction?.color ?? "#f7f7f7" }}>
+        <div className="relative flex aspect-square items-center justify-center" style={{ background: tint }}>
           {src ? (
             // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림
             <img src={src} alt={`${hero.name} 그림`} className="absolute inset-0 h-full w-full object-contain" />
@@ -56,7 +58,7 @@ async function Done({ id }: { id: string }) {
         <p className="p-4 font-display text-3xl">{hero.name}</p>
       </div>
       <div className="flex flex-wrap justify-center gap-3">
-        {src ? <DrawingReplay source={`/api/heroes/${hero.id}/drawing`} name={hero.name} background={faction?.color ?? "#f7f7f7"} /> : null}
+        {src ? <DrawingReplay source={`/api/heroes/${hero.id}/drawing`} name={hero.name} background={tint} /> : null}
         <Link
           href={`/${hero.series.slug}/${hero.slug}`}
           className="pressable inline-flex min-h-14 items-center rounded-button border-b-4 border-green-dark bg-green px-6 text-[17px] font-bold tracking-[0.053em] text-paper"

@@ -67,16 +67,18 @@ export function CharacterBrowser({ seriesSlug, statLabels, factions, kinds }: Pr
           </select>
         </div>
 
-        <ChipRow label="편">
-          <Chip pressed={!filters.faction} onClick={() => pick({ faction: null })}>
-            전체
-          </Chip>
-          {factions.map((f) => (
-            <Chip key={f.name} pressed={filters.faction === f.name} onClick={() => pick({ faction: f.name })}>
-              {f.name}
+        {factions.length ? (
+          <ChipRow label="편">
+            <Chip pressed={!filters.faction} onClick={() => pick({ faction: null })}>
+              전체
             </Chip>
-          ))}
-        </ChipRow>
+            {factions.map((f) => (
+              <Chip key={f.name} pressed={filters.faction === f.name} onClick={() => pick({ faction: f.name })}>
+                {f.name}
+              </Chip>
+            ))}
+          </ChipRow>
+        ) : null}
 
         {kinds.length > 1 ? (
           <ChipRow label="종류">

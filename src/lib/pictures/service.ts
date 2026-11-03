@@ -43,6 +43,7 @@ export async function getOfficialForPicture(familyId: string, seriesSlug: string
       slug: true,
       name: true,
       faction: { select: { color: true } },
+      kind: { select: { color: true } },
       series: { select: { slug: true, name: true } },
       familyPictures: { where: { familyId }, select: pictureSelect, take: 1 },
     },

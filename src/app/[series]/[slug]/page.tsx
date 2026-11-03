@@ -53,9 +53,9 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
   if (!c) notFound();
 
   const labels = c.series.statLabels;
-  const tint = c.faction?.color ?? "#f7f7f7";
+  const tint = c.tint;
   const factionText = FACTION_TEXT[tint.toLowerCase()] ?? "#4b4b4b";
-  const glyph = cardGlyph(c.name, c.originalName);
+  const glyph = cardGlyph(c.name);
   // 공식 인물: 우리 가족 누구나 그림을 넣고 바꿈 / 아이가 만든 영웅: 만든 아이만
   const canEditPicture = !c.isFamily || c.creatorId === viewer.profile.id;
   const topStat = STAT_ORDER.reduce((best, k) => (c.stats[k] > c.stats[best] ? k : best), STAT_ORDER[0]);
@@ -109,9 +109,7 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
                 {c.aliases.length ? <Tag>별명 · {c.aliases.join(", ")}</Tag> : null}
               </div>
               <h1 className="font-display text-[96px] leading-[1.1] tracking-[-0.02em] text-green-dark">{c.name}</h1>
-              <p className="text-2xl font-bold">
-                {[c.originalName, c.title].filter(Boolean).join(" · ")}
-              </p>
+              {c.title ? <p className="text-2xl font-bold">{c.title}</p> : null}
               {c.isFamily ? (
                 <p className="w-fit rounded-button border-2 border-green bg-green-soft px-3 py-1 text-[15px] font-bold text-green-ink">
                   {c.creatorNickname ? `${c.creatorNickname}이(가) 만든 나만의 카드` : "우리 가족이 만든 나만의 카드"}
@@ -217,7 +215,7 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
                       className="flex size-[72px] shrink-0 items-center justify-center rounded-button font-display text-[38px]"
                       style={{ background: r.factionColor ?? "#f7f7f7" }}
                     >
-                      {cardGlyph(r.name, r.originalName)}
+                      {cardGlyph(r.name)}
                     </span>
                     <span className="flex min-w-0 flex-col gap-1">
                       <span className={`text-[13px] font-bold tracking-[0.053em] ${r.isRival ? "text-[#a35200]" : "text-green-ink"}`}>

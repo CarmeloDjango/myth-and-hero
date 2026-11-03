@@ -1,3 +1,4 @@
+import { cardTint } from "@/lib/characters/browse";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -40,7 +41,9 @@ async function Wizard({ params, searchParams }: Pick<PageProps<"/me/heroes/[id]/
   const requested = Number(Array.isArray(sp.step) ? sp.step[0] : sp.step) || hero.wizardStep;
   const step = Math.min(Math.max(1, requested), Math.max(1, hero.wizardStep), STEP_COUNT);
   const current = WIZARD_STEPS[step - 1];
-  const question = current.key === "name" ? current.question : current.key === "done" ? `${hero.name || "영웅"}, ${current.question}` : `${hero.name || "영웅"}! ${current.question}`;
+  // 편이 없는 세계관(그리스신화 등)은 종류만 묻습니다.
+  const stepQuestion = current.key === "kind" && !hero.series.factions.length ? "어떤 영웅이에요?" : current.question;
+  const question = current.key === "name" ? stepQuestion : current.key === "done" ? `${hero.name || "영웅"}, ${stepQuestion}` : `${hero.name || "영웅"}! ${stepQuestion}`;
 
   return (
     <>
@@ -79,11 +82,12 @@ async function Wizard({ params, searchParams }: Pick<PageProps<"/me/heroes/[id]/
 
 function StepBody({ hero, stepKey }: { hero: WizardHero; stepKey: (typeof WIZARD_STEPS)[number]["key"] }) {
   const faction = hero.series.factions.find((f) => f.id === hero.factionId);
+  const tint = cardTint(faction, hero.series.kinds.find((k) => k.id === hero.kindId));
   switch (stepKey) {
     case "name":
       return <NameStep heroId={hero.id} name={hero.name} title={hero.title ?? ""} />;
     case "draw":
-      return <DrawStep heroId={hero.id} background={faction?.color ?? "#f7f7f7"} hasDrawing={!!hero.imageUrl} />;
+      return <DrawStep heroId={hero.id} background={tint} hasDrawing={!!hero.imageUrl} />;
     case "kind":
       return <KindStep heroId={hero.id} kinds={hero.series.kinds} factions={hero.series.factions} kindId={hero.kindId} factionId={hero.factionId} />;
     case "stats":
@@ -96,7 +100,7 @@ function StepBody({ hero, stepKey }: { hero: WizardHero; stepKey: (typeof WIZARD
       return (
         <FinishStep heroId={hero.id}>
           <div className="sticker mx-auto flex w-full max-w-[360px] flex-col overflow-hidden rounded-card">
-            <div className="relative flex aspect-square items-center justify-center" style={{ background: faction?.color ?? "#f7f7f7" }}>
+            <div className="relative flex aspect-square items-center justify-center" style={{ background: tint }}>
               {src ? (
                 // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림 (라우트 핸들러에서 권한 확인)
                 <img src={src} alt={`${hero.name} 그림`} className="absolute inset-0 h-full w-full object-contain" />

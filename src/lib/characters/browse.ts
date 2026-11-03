@@ -75,7 +75,6 @@ export function toStatLabels(raw: unknown): StatLabels {
 export type CharacterCardData = {
   slug: string;
   name: string;
-  originalName: string | null;
   title: string | null;
   rarity: number;
   stat1: number;
@@ -83,6 +82,8 @@ export type CharacterCardData = {
   stat3: number;
   faction: { name: string; color: string | null } | null;
   kindName: string | null;
+  /** 카드 배경색: 편 색, 편이 없으면 종류 색 */
+  tint: string;
   /** 아이가 만든 카드("나만의 카드")인지 */
   isFamily: boolean;
   /** 아이가 그린 그림 주소 (없으면 null) */
@@ -98,12 +99,12 @@ export type CharacterPage = {
   total: number | null;
 };
 
-/**
- * 일러스트 자리에 크게 보여줄 한 글자.
- * 한자 이름(關羽)이 있으면 한자, 아니면(Ζεύς 등) 한글 이름 첫 글자를 씁니다.
- */
-export function cardGlyph(name: string, originalName: string | null): string {
-  const first = originalName?.[0];
-  if (first && /\p{Script=Han}/u.test(first)) return first;
+/** 일러스트 자리에 크게 보여줄 한 글자: 한글 이름 첫 글자 */
+export function cardGlyph(name: string): string {
   return name[0] ?? "?";
+}
+
+/** 카드 배경색: 편 색이 먼저, 편이 없으면 종류 색 (그리스신화처럼 편이 없는 세계관) */
+export function cardTint(faction: { color: string | null } | null | undefined, kind: { color: string | null } | null | undefined): string {
+  return faction?.color ?? kind?.color ?? "#f7f7f7";
 }
