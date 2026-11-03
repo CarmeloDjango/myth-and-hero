@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { SiteFooter, SiteHeader } from "@/components/layout/SiteChrome";
 import { requireProfile } from "@/lib/family/viewer";
+import { getBattleStats } from "@/lib/battle/records";
 import { getBattlePool } from "@/lib/queries/battle";
 
 import { BattleApp } from "./battle-app";
@@ -27,6 +28,15 @@ export default function BattlePage() {
 
 async function Battle() {
   const viewer = await requireProfile();
-  const pool = await getBattlePool(viewer.family.id);
-  return <BattleApp pool={pool} profileId={viewer.profile.id} nickname={viewer.profile.nickname} />;
+  const [pool, stats] = await Promise.all([getBattlePool(viewer.family.id), getBattleStats(viewer.family.id)]);
+  const profiles = viewer.family.profiles.map((p) => ({ id: p.id, nickname: p.nickname, avatar: p.avatar }));
+  const me = profiles.find((p) => p.id === viewer.profile.id)!;
+  return (
+    <BattleApp
+      pool={pool}
+      me={me}
+      profiles={profiles}
+      stats={{ players: stats.players, recent: stats.recent.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) }}
+    />
+  );
 }

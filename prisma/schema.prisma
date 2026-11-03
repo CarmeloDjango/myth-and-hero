@@ -26,21 +26,24 @@ model Family {
   series        Series[]
   characters    Character[]
   pictures      FamilyCharacterPicture[]
+  battles       BattleRecord[]
 }
 
 /// 아이 프로필: 별명과 아바타만 저장합니다 (개인정보 없음).
 model ChildProfile {
-  id         String                   @id @default(cuid())
-  familyId   String
-  family     Family                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  nickname   String
+  id          String                   @id @default(cuid())
+  familyId    String
+  family      Family                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  nickname    String
   /// 미리 준비된 아바타 키 (src/lib/family/avatars.ts)
-  avatar     String
-  order      Int                      @default(0)
-  createdAt  DateTime                 @default(now())
-  characters Character[]              @relation("creator")
-  series     Series[]                 @relation("seriesCreator")
-  pictures   FamilyCharacterPicture[]
+  avatar      String
+  order       Int                      @default(0)
+  createdAt   DateTime                 @default(now())
+  characters  Character[]              @relation("creator")
+  series      Series[]                 @relation("seriesCreator")
+  pictures    FamilyCharacterPicture[]
+  battlesAsP1 BattleRecord[]           @relation("battleP1")
+  battlesAsP2 BattleRecord[]           @relation("battleP2")
 
   @@index([familyId, order])
 }
@@ -242,4 +245,28 @@ model FamilyCharacterPicture {
 
   @@unique([familyId, characterId])
   @@index([characterId])
+}
+
+/// 카드 배틀 결과 (가족 안 전적). 토리와 한 판은 p2Id가 null.
+model BattleRecord {
+  id        String        @id @default(cuid())
+  familyId  String
+  family    Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  /// 먼저 고른 아이 (토리 대결이면 그 아이)
+  p1Id      String?
+  p1        ChildProfile? @relation("battleP1", fields: [p1Id], references: [id], onDelete: SetNull)
+  /// 둘이 대결의 상대 아이 (null이면 토리)
+  p2Id      String?
+  p2        ChildProfile? @relation("battleP2", fields: [p2Id], references: [id], onDelete: SetNull)
+  vsTori    Boolean
+  /// 이긴 쪽: 1 또는 2
+  winner    Int
+  /// 대장 이름 (기록용, 인물이 지워져도 남게 이름으로)
+  p1Leader  String
+  p2Leader  String
+  /// 두 사람 차례 수 합
+  turns     Int
+  createdAt DateTime      @default(now())
+
+  @@index([familyId, createdAt])
 }
