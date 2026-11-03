@@ -18,6 +18,7 @@ import { STAT_KEYS, type StatKey, type StatLabels } from "@/lib/characters/brows
 import {
   HERO_NAME_MAX,
   HERO_STAT_BUDGET,
+  heroStars,
   HERO_STAT_MAX,
   HERO_TITLE_MAX,
   STORY_ANSWER_MAX,
@@ -224,6 +225,14 @@ export function StatsStep({ heroId, labels, stats }: { heroId: string; labels: S
     <form action={action} className="flex flex-col gap-5">
       <p className={`rounded-card px-5 py-4 text-center text-2xl font-bold ${left === 0 ? "bg-green-soft text-green-ink" : "bg-paper-dim"}`} aria-live="polite">
         {left === 0 ? "점수를 다 나눴어요! 멋져요!" : <>남은 점수 <span className="font-black tabular-nums text-green-dark">{left}점</span></>}
+      </p>
+      {/* 별 = 카드 배틀 비용: 점수를 많이 쓸수록 별이 늘어요 */}
+      <p className="text-center text-lg font-bold" aria-live="polite">
+        <span className="text-2xl tracking-wider text-yellow" aria-hidden="true">
+          {"★".repeat(heroStars(used))}
+          <span className="text-line">{"★".repeat(5 - heroStars(used))}</span>
+        </span>{" "}
+        별 {heroStars(used)}개 카드 <span className="text-muted">(카드 배틀 ⚡{heroStars(used)})</span>
       </p>
       {STAT_KEYS.map((k) => (
         <div key={k} className="flex flex-col gap-2">

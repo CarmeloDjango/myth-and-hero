@@ -10,6 +10,8 @@
  * 아이가 만든 영웅은 도감 능력치에서 같은 원칙으로 계산합니다(familyCardStats).
  * 도감의 능력치(통솔·무력…)는 그대로이고, 카드 숫자만 따로 있습니다.
  */
+import { heroStars } from "@/lib/heroes/rules";
+
 export type Ability = "guard" | "charge" | "scheme" | "divine";
 
 export const ABILITIES: Record<Ability, { icon: string; name: string; text: string }> = {
@@ -103,14 +105,14 @@ export const OFFICIAL_CARDS: Record<string, [cost: number, attack: number, healt
 
 /**
  * 아이가 만든 영웅 카드: 능력치 합으로 비용, 능력치 모양으로 공격·체력 나누기
- * - 비용: 합 350(가득) → 5, 250 → 4, 170 → 3 …
+ * - 비용 = 별: heroStars(능력치 합) — 300(가득) → 5, 225 → 4, 150 → 3 …
  * - 한 능력치만 높으면 공격 쪽, 골고루 높으면 체력 쪽
  */
 export function familyCardStats(stats: number[], hasAbility: boolean): { cost: number; attack: number; health: number } {
   const sum = stats.reduce((a, b) => a + b, 0);
   const max = Math.max(1, ...stats);
   const avg = stats.length ? sum / stats.length : 0;
-  const cost = clamp(Math.round((sum / 350) * 4) + 1, 1, 5);
+  const cost = heroStars(sum);
   const total = statBudget(cost, hasAbility);
   const lean = clamp(0.4 + (max / (max + avg) - 0.5) * 2.5, 0.3, 0.7);
   // 공격·체력 둘 다 1~6 안에 들도록 (합은 그대로)

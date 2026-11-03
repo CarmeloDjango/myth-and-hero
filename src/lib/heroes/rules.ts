@@ -8,7 +8,15 @@ import { STAT_KEYS, type StatKey } from "@/lib/characters/browse";
 import { josa } from "@/lib/text/josa";
 
 /** 5칸 합계 최대 점수 (확정) */
-export const HERO_STAT_BUDGET = 350;
+export const HERO_STAT_BUDGET = 300;
+
+/**
+ * 아이가 만든 영웅의 별(★) = 카드 배틀 비용(⚡). 능력치 합으로 정합니다.
+ * 300(가득) → ★5, 225 → ★4, 150 → ★3, 75 → ★2, 0 → ★1. 예전 영웅(350점)도 ★5.
+ */
+export function heroStars(statSum: number): number {
+  return Math.min(5, Math.max(1, Math.round((statSum / HERO_STAT_BUDGET) * 4) + 1));
+}
 /** 한 칸 최대 점수 */
 export const HERO_STAT_MAX = 100;
 export const HERO_NAME_MAX = 12;

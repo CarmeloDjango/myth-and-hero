@@ -135,3 +135,16 @@ test("세계관: 편 이름이 종류 이름과 같으면 거절", async () => {
   assert.equal(r.ok, false);
   assert.match(!r.ok ? r.error : "", /종류 이름과 같아요/);
 });
+
+test("영웅 별 = 능력치 합으로 (300 = ★5), 예산 300 넘으면 거절", async () => {
+  const kid = { familyId: famA.id, profileId: famA.kid1 };
+  const d = await heroes.createHeroDraft(kid, guanyu.seriesSlug);
+  assert.ok(d.ok);
+  const rarity = async () => (await db.character.findUniqueOrThrow({ where: { id: d.heroId }, select: { rarity: true } })).rarity;
+  assert.equal(await rarity(), 1, "처음엔 ★1");
+  assert.ok((await heroes.saveHeroStats(kid, d.heroId, { stat1: 100, stat2: 100, stat3: 100, stat4: 0, stat5: 0 })).ok);
+  assert.equal(await rarity(), 5);
+  assert.ok((await heroes.saveHeroStats(kid, d.heroId, { stat1: 30, stat2: 30, stat3: 30, stat4: 0, stat5: 0 })).ok);
+  assert.equal(await rarity(), 2, "90점 → ★2");
+  assert.equal((await heroes.saveHeroStats(kid, d.heroId, { stat1: 100, stat2: 100, stat3: 100, stat4: 1, stat5: 0 })).ok, false, "301점은 거절");
+});
