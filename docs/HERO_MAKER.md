@@ -1,0 +1,276 @@
+# 나만의 영웅 & 우리 가족 세계관 기능 계획
+
+아이들이 도감을 읽기만 하지 않고 **직접 영웅을 만들고, 좋아하는 세계관을 새로 추가**할 수 있게 합니다.
+
+- 전체 계획: [PLAN.md](./PLAN.md)
+- 디자인: [DESIGN.md](./DESIGN.md)
+
+## 확정된 결정
+
+| 항목 | 결정 |
+|---|---|
+| 공개 범위 | **가족만 봅니다.** 외부 공유, 공유 링크, 공개 갤러리는 만들지 않습니다. |
+| 모습 만들기 | **꾸미기(파츠 조합)와 그리기를 둘 다** 지원합니다. 기기는 **아이패드 + 애플 펜슬**을 기준으로 합니다. |
+| 아이 수 | 아이 프로필 **2명** (형제자매가 서로의 영웅을 볼 수 있음) |
+| 영웅 추가 위치 | 영웅은 **기존 세계관에 추가**합니다. 공식 세계관이든 가족이 만든 세계관이든 상관없습니다. |
+| 세계관 추가 | 영웅 만들기와는 **별도 기능**으로 세계관을 만들 수 있습니다. (예: 딸이 좋아하는 티니핑 세계관) |
+
+---
+
+## 1. 원칙
+
+1. **한 화면에 질문 하나.** 큰 버튼을 쓰고, 상단 진행 막대로 남은 단계를 보여줍니다.
+2. **글자를 잘 몰라도 끝까지 만들 수 있게.** 토리가 모든 질문을 읽어 주고(TTS), 이야기는 말로 입력할 수 있습니다.
+3. **실수해도 괜찮게.** 단계마다 자동 저장되고, 되돌리기와 뒤로 가기를 자유롭게 할 수 있습니다.
+4. **가족 데이터는 가족 안에서만.** 모든 조회와 저장은 서버에서 "이 가족의 데이터인지"를 확인합니다.
+
+---
+
+## 2. 계정 구조
+
+```
+가족(Family) ─ 부모 계정: 이메일 로그인 (Neon Auth = Managed Better Auth)
+ ├─ 아이 프로필 A: 별명 + 아바타 + 그림 비밀번호
+ └─ 아이 프로필 B: 별명 + 아바타 + 그림 비밀번호
+```
+
+- 만 14세 미만 아이의 개인정보를 모으지 않습니다. 아이 계정 없이 **프로필만** 둡니다(별명과 아바타만 저장하고, 이메일·실명·나이는 받지 않음).
+- 아이패드에서는 부모가 한 번 로그인해 두면, 아이는 프로필을 고르고 **그림 비밀번호**(동물 3개 순서대로 누르기)로 들어갑니다. 형제가 서로 바꿔 들어가는 것을 막는 정도의 가벼운 잠금입니다.
+- **부모 모드**는 부모 비밀번호(PIN)로 들어갑니다. 할 수 있는 일:
+  - 작품 숨기기와 지우기
+  - 세계관 편집과 삭제
+  - 프로필 관리
+- 기존 PLAN.md 4단계의 **관리자 = 부모 계정**입니다. 공식 인물 등록도 같은 계정으로 합니다.
+
+---
+
+## 3. 영웅 만들기 마법사
+
+| 단계 | 아이가 하는 일 | 구현 포인트 |
+|---|---|---|
+| ① 어느 세계? | 세계관 고르기. 공식 세계관과 **우리 가족 세계관**이 같이 나옵니다 | 표지 카드 그리드 |
+| ② 이름 짓기 | 이름 입력 + 칭호 고르기 ("번개 같은", "반짝반짝" …) | 칭호 추천은 세계관별로. 기본 비속어 필터 |
+| ③ 모습 만들기 | **꾸미기**로 시작하거나 **빈 종이에 그리기**. 꾸민 그림 위에 펜슬로 덧그리기도 가능 | 4장 참고 |
+| ④ 종류와 편 | 종류(장수 / 책사 / 요정 …)와 진영(촉 / 위 …) 고르기 | 세계관이 정한 목록에서 고릅니다 (6장 `CharacterKind`, `Faction`) |
+| ⑤ 능력치 나누기 | 총 250점을 5개 능력치에 나눠 주기 (능력치당 최대 100점) | 능력치 이름은 세계관마다 다릅니다(`statLabels`). 막대를 손가락이나 펜슬로 끌어서 조절. "남은 점수 37점" 표시 |
+| ⑥ 이야기 쓰기 | 빈칸 채우기 문장 틀 또는 마이크로 말하기 | 문장 틀은 세계관별 템플릿. 음성 인식은 브라우저 안에서만 처리 |
+| ⑦ 친구와 라이벌 | 같은 세계관의 영웅 고르기 (공식 영웅 + 형제가 만든 영웅) | 기존 `Relation` 재사용 |
+| 🎉 완성 | 카드가 뒤집히며 등장 → "도감에 넣기" → 도장 | **"나만의 카드" 전용 테두리**로 공식 카드와 구분 |
+
+- 중간에 나가도 `wizardStep`이 저장되어 있어서, "만드는 중" 목록에서 이어서 만들 수 있습니다.
+- 능력치 총점(250)은 설정값으로 둡니다. 나중에 세계관마다 다르게 할 수 있습니다.
+
+---
+
+## 4. 모습 만들기
+
+### 4-1. 레이어 구조
+
+```
+카드 일러스트 = [배경: 진영 색] + [꾸미기 레이어: 파츠 SVG] + [그리기 레이어: 펜슬 획]
+```
+
+- 꾸미기만 해도 되고, 그리기만 해도 되고, **꾸민 다음 그 위에 덧그려도 됩니다.**
+- 완성하면 두 레이어를 합쳐 **PNG**(1024×1024)로 만들어 카드에 씁니다.
+- 원본 데이터(파츠 JSON, 획 데이터)도 남겨 두므로, 나중에 다시 열어서 고칠 수 있습니다.
+
+### 4-2. 꾸미기 (파츠 조합)
+
+- **분류:** 몸, 얼굴(표정), 머리 또는 투구, 옷, 무기 또는 소품, 등 장식(망토, 날개)
+- 각 파츠는 **색을 바꿀 수 있는 SVG**로 만듭니다(채우기 색을 CSS 변수로 지정).
+- **파츠 팩:** 세계관 분위기에 맞게 파츠를 묶습니다.
+  - 장수 팩: 투구, 창, 갑옷
+  - 신화 팩: 월계관, 번개, 토가
+  - 요정 팩: 하트, 리본, 요정 날개, 요술봉 (티니핑 같은 세계관용)
+  - 세계관마다 기본 팩을 정하되, 다른 팩의 파츠도 자유롭게 섞을 수 있습니다.
+- 저장 형식: `{ "body": "round-1", "bodyColor": "#ff9600", "head": "helmet-2", ... }`
+- 처음에는 분류마다 4~6개 정도로 시작합니다. 파츠 그림은 DESIGN.md의 마스코트 화풍(플랫 2D, `ink` 색 외곽선)을 따릅니다.
+
+### 4-3. 그리기 (아이패드 + 애플 펜슬)
+
+| 항목 | 구현 |
+|---|---|
+| 입력 | **Pointer Events**. `pointerType === "pen"`이면 `pressure`(필압)로 선 굵기를 바꿉니다. `getCoalescedEvents()`로 빠르게 그려도 선이 부드럽게 이어지게 합니다. |
+| 손바닥 오인식 방지 | 펜 입력이 한 번 감지되면 캔버스에서 **손가락 터치를 무시**합니다(펜 전용 모드). 펜슬이 없을 때는 손가락으로도 그릴 수 있게 설정으로 전환합니다. |
+| 선 품질 | `perfect-freehand` 라이브러리로 필압이 반영된 매끈한 획을 만듭니다. |
+| 저장 방식 | 획을 **벡터 데이터(점 + 필압 배열)**로 저장합니다. 되돌리기·다시하기가 쉽고, 어떤 크기로도 다시 그릴 수 있습니다. |
+| 도구 | 펜 굵기 3단계, 색 12개, 지우개, 되돌리기·다시하기, 전체 지우기(확인창). 채우기(페인트통)는 2차에 넣습니다. |
+| 화면 | 정사각형 캔버스, 기기 픽셀 비율(devicePixelRatio)에 맞춰 선명하게 렌더링합니다. |
+| iPad Safari 대응 | 캔버스에 `touch-action: none`을 줘서 스크롤과 확대를 막습니다. 길게 눌렀을 때 뜨는 메뉴와 텍스트 선택도 막습니다(`-webkit-touch-callout: none`, `user-select: none`). |
+| 자동 저장 | 획을 그릴 때마다 몇 초 간격으로 묶어서 저장합니다. 획 데이터는 크기가 커질 수 있어서 **Neon Object Storage**에 JSON 파일로 두고, DB에는 파일 주소만 저장합니다. |
+
+### 4-4. 아이패드 홈 화면 앱 (PWA)
+
+- `manifest`를 추가하면 Safari의 **"홈 화면에 추가"**로 앱처럼 전체 화면에서 실행됩니다.
+- 주소창이 없어서 아이가 엉뚱한 곳으로 나가지 않고, 그리기 화면도 넓어집니다.
+
+---
+
+## 5. 세계관 만들기 (별도 기능)
+
+예: 딸이 좋아하는 **티니핑 세계관**을 만들고, 그 안에 직접 만든 티니핑 영웅들을 모읍니다.
+
+### 5-1. 세계관 마법사
+
+| 단계 | 내용 | 예시 (티니핑) |
+|---|---|---|
+| ① 이름 | 세계관 이름 + 한 줄 소개 | "티니핑 나라" / "마음을 지켜 주는 요정들" |
+| ② 색과 표지 | 테마 색 고르기 + 표지 그림(그리기 화면 재사용) | 분홍 |
+| ③ 능력치 이름 | 5개 능력치 이름 정하기 (추천 칩 또는 직접 입력) | 마법 / 사랑 / 용기 / 지혜 / 귀여움 |
+| ④ 종류 | 이 세계에 사는 영웅의 종류 | 티니핑 / 로열 티니핑 / 악당 |
+| ⑤ 편 (선택) | 진영 이름과 색 | 하츄핑 편 / 악당 편 |
+| ⑥ 파츠 팩 | 꾸미기 기본 팩 고르기 | 요정 팩 |
+| 🎉 완성 | 세계관 카드가 도감 첫 화면에 추가됨 | |
+
+- **누가 만드나:** 아이도 만들 수 있습니다. 수정과 삭제는 부모 모드에서만 할 수 있습니다.
+- 공식 세계관(삼국지 등)은 부모(관리자)만 고칠 수 있고, 가족 세계관은 그 가족에게만 보입니다.
+- **저작권 참고:** 티니핑 같은 실제 캐릭터를 바탕으로 한 세계관은 **가족 안에서만** 즐기는 용도입니다. 공식 이미지를 올리지 않고, 아이가 직접 그린 그림을 씁니다. 나중에 서비스를 외부에 공개하게 되면 이 부분을 다시 검토해야 합니다.
+
+### 5-2. 기존 설계에서 바꿔야 할 점
+
+| 현재 | 문제 | 변경 |
+|---|---|---|
+| `Character.role`이 고정 enum (`GOD`, `GENERAL` …) | 티니핑 세계관에는 "장수"나 "책사"가 맞지 않음 | **세계관별 종류 테이블 `CharacterKind`**로 바꿉니다. 공식 세계관의 기존 값은 마이그레이션으로 옮깁니다. |
+| 세계관(`Series`)은 모두 공용 | 가족 세계관은 그 가족만 봐야 함 | `Series.familyId` 추가 (`null`이면 공식 세계관) |
+
+지금은 시드 데이터 3명뿐이라, **지금 바꾸는 비용이 가장 적습니다.**
+
+---
+
+## 6. 데이터 모델 변경
+
+```prisma
+model Family {
+  id        String         @id @default(cuid())
+  ownerId   String         @unique  // Neon Auth 사용자 id (부모)
+  parentPin String                  // 부모 모드 PIN 해시
+  profiles  ChildProfile[]
+  series    Series[]
+  heroes    Character[]
+}
+
+model ChildProfile {
+  id          String      @id @default(cuid())
+  familyId    String
+  family      Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  nickname    String                // 별명만 저장
+  avatar      String                // 미리 준비된 아바타 키
+  pictureCode String                // 그림 비밀번호 해시
+  heroes      Character[] @relation("creator")
+  series      Series[]    @relation("seriesCreator")
+}
+
+model Series {
+  // ... 기존 필드 (slug, name, description, themeColor, statLabels, order …)
+  familyId    String?              // null = 공식 세계관
+  family      Family?       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  creatorId   String?
+  creator     ChildProfile? @relation("seriesCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  coverUrl    String?              // 그린 표지 (Object Storage)
+  partsPack   String   @default("general")
+  kinds       CharacterKind[]
+
+  @@index([familyId, order])
+}
+
+/// 세계관별 "종류": 장수 / 책사 / 군주, 신 / 영웅 / 괴물, 티니핑 / 로열 티니핑 …
+model CharacterKind {
+  id         String      @id @default(cuid())
+  seriesId   String
+  series     Series      @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  name       String
+  order      Int         @default(0)
+  characters Character[]
+
+  @@unique([seriesId, name])
+}
+
+enum CreationStatus { DRAFT DONE }
+
+model Character {
+  // ... 기존 필드 ...
+  // role Role  →  kindId로 교체
+  kindId      String?
+  kind        CharacterKind? @relation(fields: [kindId], references: [id], onDelete: SetNull)
+
+  familyId    String?          // null = 공식 인물
+  family      Family?          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  creatorId   String?
+  creator     ChildProfile?    @relation("creator", fields: [creatorId], references: [id], onDelete: SetNull)
+  status      CreationStatus   @default(DONE)
+  wizardStep  Int              @default(0)
+  hidden      Boolean          @default(false)  // 부모가 숨김
+
+  avatarParts Json?            // 꾸미기 파츠 조합
+  strokesUrl  String?          // 그리기 획 데이터 JSON (Object Storage)
+  // imageUrl / thumbUrl: 합쳐서 만든 최종 PNG
+
+  @@index([familyId, creatorId, status, updatedAt])
+  @@index([seriesId, familyId])
+}
+```
+
+**조회 규칙 (모든 쿼리에 공통으로 적용)**
+- 공식 도감: `familyId IS NULL AND published = true`
+- 우리 가족에게 보이는 것: `familyId IS NULL OR familyId = 내 가족`
+- 아이가 만든 영웅은 공식 세계관 안에 있어도 **우리 가족에게만** 보입니다.
+- 이 조건은 `src/lib/queries`의 공통 함수 하나로 만들어서, 실수로 빠뜨리지 않게 합니다.
+
+---
+
+## 7. 서버 액션
+
+| 액션 | 하는 일 | 권한 |
+|---|---|---|
+| `selectProfile(profileId, pictureCode)` | 아이 프로필로 들어가기 (세션에 profileId 저장) | 로그인한 가족 |
+| `enterParentMode(pin)` | 부모 모드 진입 (짧은 유효 시간) | 부모 |
+| `createSeries(data)` / `updateSeries` / `deleteSeries` | 세계관 만들기 / 수정 / 삭제 | 만들기는 아이도 가능, 수정·삭제는 부모 모드 |
+| `createHeroDraft(seriesId)` | 영웅 초안 생성 | 아이 프로필 |
+| `saveHeroStep(heroId, step, data)` | 단계별 저장 + 단계별 zod 검증 (이름 길이, 능력치 합계 ≤ 250, 비속어) | 만든 아이 본인 |
+| `getUploadUrl(heroId, kind)` | 획 JSON, PNG, 표지 업로드용 presigned URL | 만든 아이 본인 |
+| `finishHero(heroId)` | 필수 단계 확인 → `status = DONE` → `searchText`, `choseong` 생성 | 만든 아이 본인 |
+| `hideHero` / `deleteHero` | 숨기기 / 지우기 | 부모 모드 |
+
+- 모든 액션 안에서 **세션의 가족 id와 대상 데이터의 `familyId`가 같은지** 다시 확인합니다. 서버 액션은 외부에서 직접 호출될 수 있기 때문입니다.
+- 이미지와 획 데이터는 **Neon Object Storage**에 저장합니다. DB 브랜치와 같이 갈라지므로 개발 브랜치에서 마음껏 테스트할 수 있습니다.
+
+---
+
+## 8. 화면 구성
+
+```
+/                         세계관 고르기 (공식 + 우리 가족 세계관)
+/[series]                 도감 목록 (공식 인물 + 우리 가족 영웅, "나만의 카드" 필터)
+/[series]/[slug]          인물 상세
+/me                       프로필 고르기 (아바타 2개) → 그림 비밀번호
+/me/heroes                내가 만든 영웅 (만드는 중 / 완성)
+/me/heroes/new            영웅 만들기 시작 (세계관 고르기)
+/me/heroes/[id]/make      영웅 마법사 (?step=1~7)
+/me/worlds/new            세계관 만들기 마법사
+/parent                   부모 모드: 프로필, 작품 관리, 세계관 관리, 공식 인물 관리
+```
+
+---
+
+## 9. 단계별 로드맵
+
+PLAN.md 로드맵과 합친 순서입니다.
+
+| 단계 | 내용 | 비고 |
+|---|---|---|
+| 2. 도감 목록 | 검색, 필터, 무한 스크롤 | 기존 계획 그대로 |
+| 3. 인물 상세 | 능력치, 열전, 관계, TTS | 기존 계획 그대로 |
+| **H0. 가족과 인증** | Neon Auth 부모 로그인, 가족, 아이 프로필 2개, 그림 비밀번호, 부모 모드. **스키마 변경**(`CharacterKind`, `familyId`) 포함 | 기존 4단계(관리자)와 합쳐서 진행 |
+| **H1. 그리기 + 영웅 마법사** | 마법사 ①②④⑤⑥ + **펜슬 그리기** + 자동 저장 + 완성 카드 + "내가 만든 영웅" | 그리기는 미리 준비할 그림이 없어서 먼저 합니다 |
+| **H2. 세계관 만들기** | 세계관 마법사, 가족 세계관 표지, 능력치·종류·진영 정하기 | 티니핑 세계관을 여기서 만들 수 있게 됩니다 |
+| **H3. 꾸미기** | 파츠 SVG 팩(장수 / 신화 / 요정) + 색 바꾸기 + 꾸미기 위에 그리기 | 파츠 그림 준비가 필요합니다 |
+| **H4. 연결과 놀이** | ⑦친구와 라이벌, 음성 입력, 능력치 대결, 카드 인쇄(63×88mm), PWA | |
+| H5. AI (선택) | 아이가 쓴 이야기로 그림이나 문장 다듬기 제안. 부모가 승인한 뒤 반영 | 비용과 안전 정책을 정한 뒤 |
+
+---
+
+## 10. 남은 질문
+
+1. **파츠 그림 준비:** 직접 그릴지, AI로 만든 뒤 다듬을지, 무료 소스를 쓸지 (H3 전까지 정하면 됩니다)
+2. **능력치 총점:** 250점으로 시작해도 될지. 세계관마다 다르게 할지
+3. **그림 비밀번호:** 아이 둘 다 필요한지, 아니면 프로필 아바타만 눌러서 바로 들어가도 될지
