@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -17,6 +17,11 @@ import type { AvatarKey } from "@/lib/family/avatars";
 
 export function ParentPinForm() {
   const [state, action, pending] = useActionState(enterParentModeAction, undefined);
+  const router = useRouter();
+  // PIN이 맞으면 새 요청으로 다시 그려서 부모 모드 화면을 보여줍니다.
+  useEffect(() => {
+    if (state?.ok) router.refresh();
+  }, [state, router]);
   return (
     <form action={action} className="flex flex-col gap-5">
       <TextField id="pin" name="pin" label="부모 PIN" type="password" inputMode="numeric" autoComplete="off" maxLength={6} required autoFocus />

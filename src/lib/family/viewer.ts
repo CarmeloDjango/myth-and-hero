@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth/server";
@@ -28,8 +29,9 @@ export type Viewer = {
  * 로그인하지 않았으면 null입니다.
  */
 export const getViewer = cache(async (): Promise<Viewer | null> => {
-  // 쿠키를 먼저 읽어 요청 시점 코드임을 표시합니다. 미리 그리기(prerender) 중에는 여기서 멈추므로
-  // 인증 SDK가 끝난 prerender에서 쿠키를 읽다가 오류를 남기지 않습니다.
+  // 실제 요청에서만 실행합니다. 미리 그리기(prerender)나 미리 불러오기(runtime prefetch) 중에는 여기서 멈추므로,
+  // 인증 SDK가 이미 끝난 prerender 안에서 네트워크 요청을 하다 끊겨 오류를 남기지 않습니다.
+  await connection();
   const jar = await cookies();
   const { data: session } = await auth.getSession();
   const user = session?.user;

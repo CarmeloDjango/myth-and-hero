@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -62,15 +63,21 @@ export async function createFamilyAction(_prev: FormState, form: FormData): Prom
   redirect("/me");
 }
 
-/** 아이가 자기 아바타를 누르면 바로 들어갑니다 (비밀번호 없음). */
-export async function selectProfileAction(profileId: string) {
+/**
+ * 아이가 자기 아바타를 누르면 바로 들어갑니다 (비밀번호 없음).
+ * 여기서 redirect하지 않습니다: 같은 요청 안에서 그리는 다음 화면은 방금 바꾼 쿠키를 아직 못 보기 때문에,
+ * 홈이 "프로필 없음"으로 보고 다시 /me로 돌려보냅니다. 화면 이동은 클라이언트가 새 요청으로 합니다.
+ */
+export async function selectProfileAction(profileId: string): Promise<FormState> {
   const viewer = await getFamilyViewerOrNull();
-  if (!viewer) redirect("/auth/sign-in");
-  if (!viewer.family.profiles.some((p) => p.id === profileId)) redirect("/me");
+  if (!viewer) return { error: "로그인이 필요해요." };
+  if (!viewer.family.profiles.some((p) => p.id === profileId)) return { error: "우리 가족 프로필이 아니에요." };
 
   const jar = await cookies();
   jar.set(PROFILE_COOKIE, profileId, { ...cookieBase, maxAge: 60 * 60 * 24 * 365 });
-  redirect("/");
+  // 보는 사람이 바뀌면 모든 화면이 달라지므로, 브라우저가 받아 둔 화면(클라이언트 캐시)을 모두 버립니다.
+  revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 /** 부모 모드 들어가기: PIN 확인 후 10분 동안 유지됩니다. */
@@ -92,12 +99,15 @@ export async function enterParentModeAction(_prev: FormState, form: FormData): P
     ...cookieBase,
     maxAge: Math.floor(PARENT_MODE_TTL_MS / 1000),
   });
-  redirect("/parent");
+  // redirect하지 않습니다: 같은 요청에서 그리는 화면은 새 쿠키를 아직 못 봅니다. 클라이언트가 새로고침합니다.
+  revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 export async function exitParentModeAction() {
   const jar = await cookies();
   jar.delete(PARENT_COOKIE);
+  revalidatePath("/", "layout");
   redirect("/me");
 }
 

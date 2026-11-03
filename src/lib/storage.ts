@@ -1,6 +1,11 @@
 import "server-only";
 
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 import { DeleteObjectsCommand, GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+import { HttpsProxyAgent } from "https-proxy-agent";
 
 /**
  * 그림 저장소 (Neon Object Storage `drawings` 버킷, 비공개)
@@ -9,6 +14,8 @@ import { DeleteObjectsCommand, GetObjectCommand, NoSuchKey, PutObjectCommand, S3
  *   (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_ENDPOINT_URL_S3, AWS_REGION).
  * - 브라우저는 저장소에 직접 접근하지 않습니다. 앱의 라우트 핸들러가 가족을 확인한 뒤 읽고 씁니다.
  * - 테스트에서는 setDrawingStore()로 메모리 저장소를 끼워 넣습니다.
+ * - 로컬 개발: DRAWING_STORE=filesystem 이면 .data/drawings 폴더에 저장합니다 (Neon 저장소 없이 개발할 때).
+ *   이 값을 넣지 않으면 항상 Neon 저장소를 씁니다.
  */
 export type StoredObject = { body: Uint8Array; contentType: string };
 
@@ -20,8 +27,16 @@ export interface DrawingStore {
 
 const BUCKET = "drawings";
 
+function httpsProxy(): string | undefined {
+  return process.env.HTTPS_PROXY || process.env.https_proxy || undefined;
+}
+
 class S3DrawingStore implements DrawingStore {
-  private client = new S3Client({ forcePathStyle: true }); // Neon은 path-style 주소가 필요합니다.
+  private client = new S3Client({
+    forcePathStyle: true, // Neon은 path-style 주소가 필요합니다.
+    // AWS SDK는 HTTPS_PROXY를 스스로 읽지 않습니다. 프록시를 거쳐야 하는 환경(회사망, 샌드박스)에서만 씁니다.
+    ...(httpsProxy() ? { requestHandler: new NodeHttpHandler({ httpsAgent: new HttpsProxyAgent(httpsProxy()!) }) } : {}),
+  });
 
   async put(key: string, body: Uint8Array | string, contentType: string) {
     await this.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ContentType: contentType }));
@@ -46,10 +61,42 @@ class S3DrawingStore implements DrawingStore {
   }
 }
 
+/** 로컬 개발용 파일 저장소 */
+class FileDrawingStore implements DrawingStore {
+  private root = path.resolve(process.env.DRAWING_STORE_DIR ?? ".data/drawings");
+
+  private resolve(key: string) {
+    const full = path.resolve(this.root, key);
+    if (!full.startsWith(this.root + path.sep)) throw new Error(`잘못된 저장소 키: ${key}`);
+    return full;
+  }
+
+  async put(key: string, body: Uint8Array | string, contentType: string) {
+    const file = this.resolve(key);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, body);
+    await writeFile(`${file}.type`, contentType);
+  }
+
+  async get(key: string): Promise<StoredObject | null> {
+    try {
+      const file = this.resolve(key);
+      const [body, contentType] = await Promise.all([readFile(file), readFile(`${file}.type`, "utf8").catch(() => "application/octet-stream")]);
+      return { body: new Uint8Array(body), contentType };
+    } catch {
+      return null;
+    }
+  }
+
+  async deleteMany(keys: string[]) {
+    await Promise.all(keys.flatMap((k) => [rm(this.resolve(k), { force: true }), rm(`${this.resolve(k)}.type`, { force: true })]));
+  }
+}
+
 let store: DrawingStore | undefined;
 
 export function getDrawingStore(): DrawingStore {
-  store ??= new S3DrawingStore();
+  store ??= process.env.DRAWING_STORE === "filesystem" ? new FileDrawingStore() : new S3DrawingStore();
   return store;
 }
 

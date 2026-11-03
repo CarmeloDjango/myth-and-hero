@@ -2,9 +2,10 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { selectProfileAction } from "@/app/actions/family";
 import { ProfileAvatar } from "@/components/family/ProfileAvatar";
 import { requireFamily } from "@/lib/family/viewer";
+
+import { ProfileButton } from "./profile-button";
 
 export const metadata: Metadata = { title: "누가 볼까요? · 영웅 도감" };
 
@@ -28,16 +29,10 @@ async function ProfileChooser() {
       <ul className="flex flex-wrap justify-center gap-6">
         {viewer.family.profiles.map((p) => (
           <li key={p.id}>
-            <form action={selectProfileAction.bind(null, p.id)}>
-              <button
-                type="submit"
-                aria-current={viewer.profile?.id === p.id ? "true" : undefined}
-                className="sticker pressable flex w-44 flex-col items-center gap-3 rounded-card bg-paper px-4 py-6 transition-transform hover:-translate-y-1"
-              >
-                <ProfileAvatar nickname={p.nickname} avatar={p.avatar} size={112} />
-                <span className="font-display text-3xl">{p.nickname}</span>
-              </button>
-            </form>
+            <ProfileButton profileId={p.id} current={viewer.profile?.id === p.id}>
+              <ProfileAvatar nickname={p.nickname} avatar={p.avatar} size={112} />
+              <span className="font-display text-3xl">{p.nickname}</span>
+            </ProfileButton>
           </li>
         ))}
       </ul>

@@ -46,7 +46,7 @@ export function SetupForm() {
         <TextField id="pinConfirm" name="pinConfirm" label="PIN 한 번 더" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} required />
       </fieldset>
 
-      <FormError>{state?.error}</FormError>
+      <FormError>{state?.error ? `${state.error} (PIN은 안전을 위해 지웠어요. 두 칸 모두 다시 입력해 주세요.)` : undefined}</FormError>
       <PrimaryButton type="submit" disabled={pending}>
         {pending ? "만드는 중…" : "가족 도감 만들기"}
       </PrimaryButton>

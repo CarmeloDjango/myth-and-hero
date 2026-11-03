@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { FormError, PrimaryButton, TextField } from "@/components/ui/form";
 import { authClient } from "@/lib/auth/client";
@@ -26,14 +25,24 @@ function toMessage(error: { code?: string; message?: string; status?: number } |
     case "EMAIL_NOT_VERIFIED":
       return "이메일 인증을 먼저 마쳐 주세요.";
     default:
-      return error?.status === 429
-        ? "잠시 뒤에 다시 시도해 주세요."
-        : "로그인 서버에 연결하지 못했어요. 잠시 뒤에 다시 시도해 주세요.";
+      // 코드가 바뀌거나 없어도, 401은 "아이디·비밀번호가 맞지 않음"입니다.
+      if (error?.status === 401) return "이메일이나 비밀번호가 맞지 않아요.";
+      if (error?.status === 422 || error?.status === 400) return "입력한 내용을 다시 확인해 주세요.";
+      if (error?.status === 429) return "잠시 뒤에 다시 시도해 주세요.";
+      return "로그인 서버에 연결하지 못했어요. 잠시 뒤에 다시 시도해 주세요.";
   }
 }
 
+/** 던져진 오류에서 상태 코드와 오류 코드를 꺼냅니다 (네트워크 오류면 null). */
+function readAuthError(thrown: unknown): { code?: string; status?: number } | null {
+  if (!thrown || typeof thrown !== "object") return null;
+  const e = thrown as { code?: unknown; status?: unknown; error?: { code?: unknown; status?: unknown } };
+  const code = typeof e.code === "string" ? e.code : typeof e.error?.code === "string" ? e.error.code : undefined;
+  const status = typeof e.status === "number" ? e.status : typeof e.error?.status === "number" ? e.error.status : undefined;
+  return code || status ? { code, status } : null;
+}
+
 export function AuthForm({ mode }: { mode: Mode }) {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -53,11 +62,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
         setError(toMessage(result.error));
         return;
       }
-      // 서버 화면이 새 세션으로 다시 그려지도록 이동 후 새로고침합니다.
-      router.replace("/");
-      router.refresh();
-    } catch {
-      setError(toMessage(null));
+      // 로그인한 사람이 바뀌었으니 새 세션으로 전체를 새로 엽니다 (미리 받아 둔 화면을 쓰지 않도록).
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 위 이유로 의도적
+      window.location.assign("/");
+    } catch (thrown) {
+      // Neon Auth 클라이언트는 401 같은 응답을 { error }로 돌려주지 않고 예외로 던지기도 합니다.
+      setError(toMessage(readAuthError(thrown)));
     } finally {
       setPending(false);
     }

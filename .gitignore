@@ -43,3 +43,6 @@ next-env.d.ts
 
 # prisma client (generated)
 /src/generated/
+
+# 로컬 개발용 그림 저장소 (DRAWING_STORE=filesystem)
+/.data/
