@@ -358,9 +358,7 @@ function PlayerBar({
       } ${hits.length ? "[animation:hit-shake_.4s]" : ""}`}
       style={{ background: l.tint }}
     >
-      {seat.kind === "tori" ? (
-        <Tori size={52} mood={hits.length ? "wow" : "happy"} />
-      ) : l.imageSrc ? (
+      {l.imageSrc ? (
         // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림
         <img src={l.imageSrc} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" />
       ) : (
@@ -385,8 +383,12 @@ function PlayerBar({
       )}
       <div className="flex min-w-0 flex-col">
         <span className="flex items-center gap-1.5 truncate text-lg font-bold">
-          {seat.kind === "kid" ? <ProfileAvatar nickname={seat.profile.nickname} avatar={seat.profile.avatar} size={24} /> : null}
-          {seat.kind === "tori" ? "토리" : `${seat.profile.nickname} · 대장 ${l.name}`}
+          {seat.kind === "kid" ? (
+            <ProfileAvatar nickname={seat.profile.nickname} avatar={seat.profile.avatar} size={24} />
+          ) : (
+            <Tori size={28} mood={hits.length ? "wow" : "happy"} />
+          )}
+          {`${seatName(seat)} · 대장 ${l.name}`}
         </span>
         <span className="flex items-center gap-1 font-black" aria-label={`대장 체력 ${l.hp}`}>
           <span aria-hidden="true" className="text-sm font-bold text-muted">대장 체력</span>

@@ -15,7 +15,6 @@ import { Game } from "./game";
 import { PlayerSetup } from "./setup";
 import { seatName, type Loadout, type Profile, type Seat, type StatsView } from "./types";
 
-const TORI_LEADER = { name: "토리", imageSrc: null, tint: "#f3e1ff" };
 const RULES =
   "카드를 눌러서 필드에 내요. 카드를 내려면 번개 숫자만큼 에너지가 필요해요. 필드에 있는 내 카드를 누르고, 상대 카드나 대장을 눌러서 공격해요. 상대 대장의 체력을 0으로 만들면 이겨요!";
 
@@ -35,11 +34,17 @@ export function BattleApp({ pool, me, profiles, stats }: { pool: CardDef[]; me: 
     // 토리 대결은 아이가 먼저, 둘이 대결은 동전 던지기
     const duo = seats[1].kind === "kid";
     const first: Side = duo ? ((seed % 2) as Side) : 0;
-    const toriLoadout = (l: Loadout): Loadout => ({ ...l, deck: buildDeck(officials.length >= DECK_SIZE ? officials : pool, { seed: seed + 7 }) });
-    const lo: [Loadout, Loadout] = [loadouts[0], seats[1].kind === "tori" ? toriLoadout(loadouts[1]) : loadouts[1]];
+    // 토리도 매 판 도감 인물 중 하나를 대장으로 (아이 대장과 겹치지 않게), 덱은 공식 인물로
+    const toriLoadout = (): Loadout => {
+      const candidates = officials.filter((c) => c.id !== loadouts[0].leader.id);
+      const leader = candidates[seed % Math.max(1, candidates.length)] ?? loadouts[0].leader;
+      const deckPool = (officials.length > DECK_SIZE ? officials : pool).filter((c) => c.id !== leader.id);
+      return { leader, deck: buildDeck(deckPool, { seed: seed + 7 }) };
+    };
+    const lo: [Loadout, Loadout] = [loadouts[0], seats[1].kind === "tori" ? toriLoadout() : loadouts[1]];
     const setup = (seat: Seat, l: Loadout) => ({
       name: seatName(seat),
-      leader: seat.kind === "tori" ? TORI_LEADER : { name: l.leader.name, imageSrc: l.leader.imageSrc, tint: l.leader.tint },
+      leader: { name: l.leader.name, imageSrc: l.leader.imageSrc, tint: l.leader.tint },
       deck: l.deck,
     });
     setPhase({ k: "game", seats, loadouts: lo, state: newBattle(setup(seats[0], lo[0]), setup(seats[1], lo[1]), seed, first) });
@@ -53,7 +58,7 @@ export function BattleApp({ pool, me, profiles, stats }: { pool: CardDef[]; me: 
         p2Id: seats[1].kind === "kid" ? seats[1].profile.id : null,
         winner: s.winner + 1,
         p1Leader: loadouts[0].leader.name,
-        p2Leader: seats[1].kind === "tori" ? "토리" : loadouts[1].leader.name,
+        p2Leader: loadouts[1].leader.name,
         turns: s.turnNo,
       }).catch(() => {});
     },
