@@ -105,12 +105,6 @@ export function setDrawingStore(next: DrawingStore | undefined) {
   store = next;
 }
 
-/** 저장소 키: 가족 → 영웅 → 버전별 파일 (새 그림마다 새 키라서 캐시가 꼬이지 않습니다) */
-export function drawingKeys(familyId: string, heroId: string, version: string) {
-  const base = `families/${familyId}/heroes/${heroId}/${version}`;
-  return { png: `${base}/drawing.png`, strokes: `${base}/strokes.json` };
-}
-
 /** 세계관 표지 키: 그림 PNG와 획 JSON을 같은 버전 폴더에 둡니다 (획 키는 그림 키에서 알 수 있음). */
 export function worldCoverKeys(familyId: string, seriesId: string, version: string) {
   const base = `families/${familyId}/worlds/${seriesId}/${version}`;

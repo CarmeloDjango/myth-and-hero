@@ -145,3 +145,5 @@ export function isBrushOp(s: Stroke): s is BrushOp {
 /** 업로드 제한 (Vercel 요청 본문 4.5MB 이내) */
 export const MAX_PNG_BYTES = 2 * 1024 * 1024;
 export const MAX_STROKES_BYTES = 2 * 1024 * 1024;
+/** 밑그림 사진 (브라우저에서 1024px JPEG로 줄인 뒤) */
+export const MAX_BACKGROUND_BYTES = 2 * 1024 * 1024;

@@ -99,7 +99,7 @@ export function DrawStep({ heroId, background, hasDrawing }: { heroId: string; b
   const router = useRouter();
   const [leaving, setLeaving] = useState(false);
   return (
-    <AutosaveDrawing saveUrl={`/api/heroes/${heroId}/drawing`} background={background} hasDrawing={hasDrawing}>
+    <AutosaveDrawing saveUrl={`/api/heroes/${heroId}/drawing`} background={background} hasDrawing={hasDrawing} allowPhoto>
       {({ flush, touched, ready }) => (
         <StepNav heroId={heroId} step={stepIndex("draw")}>
           <PrimaryButton

@@ -16,12 +16,14 @@ type FlipCardProps = {
   stats: Record<StatKey, number>;
   labels: StatLabels;
   motto: string;
-  /** 아이가 그린 그림 (나만의 카드) */
+  /** 카드 그림 (아이가 만든 영웅의 그림, 또는 공식 인물에 우리 가족이 붙인 그림) */
   imageSrc?: string | null;
+  /** 아이가 만든 영웅인지 ("나만의 카드" 배지) */
+  isFamily?: boolean;
 };
 
 /** 누르면 뒤집히는 카드: 앞면은 일러스트, 뒷면은 능력치 */
-export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imageSrc }: FlipCardProps) {
+export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imageSrc, isFamily = false }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false);
 
   return (
@@ -50,11 +52,11 @@ export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imag
             <span className="absolute left-3.5 top-3.5 rounded-button border-2 border-yellow bg-paper px-3 py-1 text-[15px] font-black">
               {"★".repeat(rarity)}
             </span>
-            {imageSrc !== undefined && imageSrc !== null ? (
+            {isFamily ? (
               <span className="absolute bottom-3 left-3.5 rounded-button border-2 border-green bg-paper px-2.5 py-0.5 text-xs font-bold text-green-ink">
                 나만의 카드
               </span>
-            ) : (
+            ) : imageSrc ? null : (
               <span className="absolute bottom-3 left-3.5 rounded-button bg-paper px-2.5 py-0.5 text-xs font-bold text-muted">
                 일러스트 자리
               </span>

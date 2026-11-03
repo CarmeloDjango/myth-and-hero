@@ -8,6 +8,7 @@ import { CenteredPanel, SecondaryButton } from "@/components/ui/form";
 import { AVATAR_KEYS, MAX_PROFILES, type AvatarKey } from "@/lib/family/avatars";
 import { requireFamily } from "@/lib/family/viewer";
 import { heroImageSrc, listFamilyHeroes } from "@/lib/heroes/service";
+import { listOfficialWithoutPicture } from "@/lib/pictures/service";
 import { worldColor } from "@/lib/worlds/rules";
 import { listFamilyWorlds, worldCoverSrc } from "@/lib/worlds/service";
 
@@ -48,7 +49,12 @@ async function ParentContent() {
   }
 
   const profiles = viewer.family.profiles;
-  const [heroRows, worldRows] = await Promise.all([listFamilyHeroes(viewer.family.id), listFamilyWorlds(viewer.family.id)]);
+  const [heroRows, worldRows, noPicture] = await Promise.all([
+    listFamilyHeroes(viewer.family.id),
+    listFamilyWorlds(viewer.family.id),
+    listOfficialWithoutPicture(viewer.family.id),
+  ]);
+  const noPictureBySeries = Map.groupBy(noPicture, (c) => c.series.name);
   const worlds = worldRows.map((w) => ({
     id: w.id,
     slug: w.slug,
@@ -105,6 +111,38 @@ async function ParentContent() {
           </h2>
           <p className="font-medium text-muted">세계관을 지우면 그 안의 영웅과 그림도 함께 지워져요.</p>
           <ParentWorldList worlds={worlds} />
+        </section>
+
+        <section aria-labelledby="no-picture" className="flex flex-col gap-4">
+          <h2 id="no-picture" className="text-[32px] font-bold">
+            그림이 없는 인물 ({noPicture.length})
+          </h2>
+          <p className="font-medium text-muted">
+            누르면 그림 넣기 화면이 열려요. 사진을 올리거나 직접 그릴 수 있고, 붙인 그림은 우리 가족에게만 보여요. 아이들도 인물 화면의 &ldquo;그림 넣기&rdquo;로 넣을 수 있어요.
+          </p>
+          {noPicture.length ? (
+            <div className="flex flex-col gap-3">
+              {[...noPictureBySeries].map(([series, list]) => (
+                <div key={series} className="flex flex-col gap-2">
+                  <h3 className="text-lg font-bold">{series}</h3>
+                  <ul className="flex flex-wrap gap-2">
+                    {list.map((c) => (
+                      <li key={c.id}>
+                        <Link
+                          href={`/${c.series.slug}/${c.slug}/picture`}
+                          className="sticker pressable inline-flex min-h-11 items-center rounded-button bg-paper px-3 text-[15px] font-bold text-blue-ink hover:bg-paper-dim"
+                        >
+                          {c.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-card bg-green-soft p-5 font-bold text-green-ink">모든 인물에 그림이 있어요!</p>
+          )}
         </section>
 
         <section aria-labelledby="heroes" className="flex flex-col gap-4">

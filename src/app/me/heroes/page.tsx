@@ -89,7 +89,7 @@ async function HeroLists() {
             {done.map((h) => {
               const src = heroImageSrc(h);
               return (
-                <li key={h.id}>
+                <li key={h.id} className="flex flex-col gap-2">
                   <Link
                     href={`/${h.series.slug}/${h.slug}`}
                     className="sticker pressable flex flex-col overflow-hidden rounded-card bg-paper transition-transform hover:-translate-y-1"
@@ -108,6 +108,12 @@ async function HeroLists() {
                       <span className="text-[13px] font-bold text-muted">{h.series.name}</span>
                       <span className="font-display text-3xl">{h.name}</span>
                     </span>
+                  </Link>
+                  <Link
+                    href={`/${h.series.slug}/${h.slug}/picture`}
+                    className="sticker pressable inline-flex min-h-11 items-center justify-center rounded-button bg-paper px-3 text-[15px] font-bold text-blue-ink hover:bg-paper-dim"
+                  >
+                    {src ? "그림 고치기" : "그림 넣기"}
                   </Link>
                 </li>
               );

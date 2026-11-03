@@ -56,6 +56,8 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
   const tint = c.faction?.color ?? "#f7f7f7";
   const factionText = FACTION_TEXT[tint.toLowerCase()] ?? "#4b4b4b";
   const glyph = cardGlyph(c.name, c.originalName);
+  // 공식 인물: 우리 가족 누구나 그림을 넣고 바꿈 / 아이가 만든 영웅: 만든 아이만
+  const canEditPicture = !c.isFamily || c.creatorId === viewer.profile.id;
   const topStat = STAT_ORDER.reduce((best, k) => (c.stats[k] > c.stats[best] ? k : best), STAT_ORDER[0]);
   const paragraphs = c.biography.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   // 문장 끝에 마침표가 없을 때만 붙여서 "예요.." 처럼 두 번 찍히지 않게 합니다.
@@ -90,6 +92,7 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
                 labels={labels}
                 motto={c.summary}
                 imageSrc={c.imageSrc}
+                isFamily={c.isFamily}
               />
             </div>
 
@@ -117,7 +120,18 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
               <div className="flex flex-wrap gap-3 pt-2">
                 <ReadAloudButton text={readText} />
                 <CollectButton cardId={`${c.series.slug}/${c.slug}`} name={c.name} />
-                {c.replayId ? <DrawingReplay heroId={c.replayId} name={c.name} background={tint} /> : null}
+                {c.replaySource ? <DrawingReplay source={c.replaySource} name={c.name} background={tint} /> : null}
+                {canEditPicture ? (
+                  <Link
+                    href={`/${c.series.slug}/${c.slug}/picture`}
+                    className="sticker pressable inline-flex min-h-14 items-center gap-2 rounded-button bg-paper px-6 text-[17px] font-bold tracking-[0.053em] text-blue-ink hover:bg-paper-dim"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 20 l4-1 L19 8 l-3-3 L5 16 z" />
+                    </svg>
+                    {c.imageSrc ? "그림 바꾸기" : "그림 넣기"}
+                  </Link>
+                ) : null}
               </div>
             </div>
           </div>

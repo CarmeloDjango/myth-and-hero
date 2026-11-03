@@ -148,12 +148,12 @@ export async function deleteWorld(familyId: string, seriesId: string, d?: Deps):
   const { db, store } = deps(d);
   const world = await db.series.findFirst({
     where: { id: seriesId, familyId },
-    select: { id: true, coverImage: true, characters: { select: { imageUrl: true, strokesUrl: true } } },
+    select: { id: true, coverImage: true, characters: { select: { imageUrl: true, strokesUrl: true, backgroundUrl: true } } },
   });
   if (!world) return fail("우리 가족 세계관이 아니에요.");
 
   const files = [
-    ...world.characters.flatMap((c) => [c.imageUrl, c.strokesUrl]),
+    ...world.characters.flatMap((c) => [c.imageUrl, c.strokesUrl, c.backgroundUrl]),
     world.coverImage,
     world.coverImage ? coverStrokesKey(world.coverImage) : null,
   ].filter((k): k is string => !!k?.startsWith("families/"));
