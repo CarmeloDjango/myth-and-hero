@@ -6,7 +6,7 @@
  * - 특별한 힘이 있으면 그 값으로 1을 뺍니다.
  * - 공격·체력은 최대 6. 한 방에 끝나는 카드가 없어야 끝까지 조마조마합니다.
  *
- * 공식 인물(삼국지, 그리스신화)은 한 장씩 손으로 정한 숫자(OFFICIAL_CARDS)를 쓰고,
+ * 공식 인물(그리스신화, 삼국지, 수호지, 초한지)은 한 장씩 손으로 정한 숫자(OFFICIAL_CARDS)를 쓰고,
  * 아이가 만든 영웅은 도감 능력치에서 같은 원칙으로 계산합니다(familyCardStats).
  * 도감의 능력치(통솔·무력…)는 그대로이고, 카드 숫자만 따로 있습니다.
  */
@@ -22,13 +22,15 @@ export const ABILITIES: Record<Ability, { icon: string; name: string; text: stri
   fire: { icon: "🔥", name: "불꽃", text: "낼 때 상대 대장에게 2 피해를 줘요." },
 };
 
-/** 종류 이름 → 특별한 힘 (공식 세계관의 종류) */
+/** 종류 이름 → 특별한 힘 (공식 세계관의 종류; 군주·두령은 없음) */
 export const KIND_ABILITY: Record<string, Ability> = {
   장수: "guard",
   영웅: "guard",
   괴물: "charge",
   책사: "scheme",
   신: "divine",
+  호걸: "charge",
+  도사: "divine",
 };
 
 /** 영웅 만들기에서 고를 수 있는 특별한 힘 */
@@ -77,25 +79,28 @@ export function statBudget(cost: number, hasAbility: boolean): number {
 }
 
 /**
- * 공식 인물 카드 (slug → 비용/공격/체력). 비용별 장수: 1:2, 2:6, 3:11, 4:9, 5:6
- * 특별한 힘은 종류에서 (장수·영웅 🛡️, 괴물 💨, 책사 📜, 신 ✨, 군주 없음)
+ * 공식 인물 카드 (slug → 비용/공격/체력). 비용별 장수: 1:4, 2:10, 3:20, 4:18, 5:11
+ * 특별한 힘은 종류에서 (장수·영웅 🛡️, 괴물·호걸 💨, 책사 📜, 신·도사 ✨, 군주·두령 없음).
+ * 몇 명은 시드에서 따로 정합니다(seed-data의 ability):
+ *   그리스신화 아테나 📜, 포세이돈 🛡️, 하데스 없음, 아폴론 🔥, 아르테미스·헤르메스 💨 / 초한지 항우·번쾌·하후영 💨 / 수호지 대종·연청 📜
+ * 시뮬레이션(docs/BATTLE.md)으로 네 세계관의 한 세계관 덱끼리 46~57%가 되게 맞췄습니다.
  */
 export const OFFICIAL_CARDS: Record<string, [cost: number, attack: number, health: number]> = {
   // 그리스신화
-  zeus: [5, 5, 5], // ✨ 천둥의 신
-  athena: [5, 4, 6], // ✨ 지혜
+  zeus: [5, 4, 6], // ✨ 천둥의 신 (그리스신화에서 ✨는 제우스만)
+  athena: [5, 4, 6], // 📜 지혜
   heracles: [5, 4, 6], // 🛡️ 열두 과업
-  poseidon: [4, 4, 4], // ✨
-  hades: [4, 5, 3], // ✨
-  achilles: [4, 4, 4], // 🛡️
-  apollo: [3, 3, 3], // ✨
-  artemis: [3, 4, 2], // ✨ 사냥꾼
-  perseus: [3, 3, 3], // 🛡️
+  poseidon: [4, 3, 5], // 🛡️ 바다의 벽
+  hades: [4, 4, 5], // 힘 없음 (조용한 저승의 왕)
+  achilles: [4, 3, 5], // 🛡️
+  apollo: [3, 2, 4], // 🔥 태양
+  artemis: [3, 2, 4], // 💨 사냥꾼
+  perseus: [3, 2, 4], // 🛡️
   theseus: [3, 2, 4], // 🛡️
-  minotaur: [3, 4, 2], // 💨 황소
+  minotaur: [3, 3, 3], // 💨 황소
   odysseus: [2, 2, 2], // 🛡️
-  medusa: [2, 3, 1], // 💨
-  hermes: [1, 1, 1], // ✨ 빠른 전령
+  medusa: [2, 1, 3], // 💨
+  hermes: [1, 1, 1], // 💨 빠른 전령
   // 삼국지
   "guan-yu": [5, 5, 5], // 🛡️ 미염공
   "lu-bu": [5, 6, 4], // 🛡️ 천하제일 무장
@@ -117,6 +122,37 @@ export const OFFICIAL_CARDS: Record<string, [cost: number, attack: number, healt
   "gan-ning": [2, 3, 1], // 🛡️
   "yuan-shao": [2, 2, 3], // 군주
   "dong-zhuo": [1, 2, 1], // 군주
+  // 수호지 (두령 없음, 장수 🛡️, 호걸 💨, 책사 📜, 도사 ✨)
+  "song-jiang": [4, 4, 5], // 두령 급시우
+  "lu-junyi": [4, 4, 5], // 두령
+  "chao-gai": [3, 3, 4], // 두령
+  "lin-chong": [5, 5, 5], // 🛡️ 표자두
+  "guan-sheng": [4, 4, 4], // 🛡️
+  "hua-rong": [3, 3, 3], // 🛡️
+  "yang-zhi": [3, 2, 4], // 🛡️
+  "zhang-qing": [2, 2, 2], // 🛡️
+  "wu-song": [5, 5, 5], // 💨 호랑이 잡은 행자
+  "lu-zhishen": [4, 4, 4], // 💨
+  "li-kui": [3, 4, 2], // 💨 흑선풍
+  "yan-qing": [2, 2, 2], // 📜 (종류는 호걸이지만 영리한 꾀돌이)
+  "dai-zong": [1, 1, 1], // 📜 (소식을 전하는 전령)
+  "wu-yong": [4, 3, 5], // 📜
+  "gongsun-sheng": [3, 3, 3], // ✨ 도술
+  // 초한지
+  "liu-bang": [4, 5, 4], // 군주
+  "xiang-yu": [5, 6, 4], // 💨 (군주지만 언제나 맨 앞에서 달림)
+  "qin-shi-huang": [4, 5, 4], // 군주
+  "chen-sheng": [1, 2, 1], // 군주
+  "han-xin": [5, 6, 4], // 🛡️ 국사무쌍
+  "fan-kuai": [3, 4, 2], // 💨 (잔치 자리로 뛰어든 용사)
+  "xiahou-ying": [2, 3, 1], // 💨 (수레를 모는 장수)
+  "ying-bu": [3, 4, 2], // 🛡️
+  "zhongli-mo": [3, 3, 3], // 🛡️
+  "ji-bu": [2, 2, 2], // 🛡️
+  "zhang-liang": [5, 5, 5], // 📜
+  "xiao-he": [4, 4, 4], // 📜
+  "chen-ping": [3, 3, 3], // 📜
+  "fan-zeng": [4, 4, 4], // 📜
 };
 
 /**

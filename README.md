@@ -21,7 +21,7 @@ neon login
 neon deploy          # neon.ts 적용 + .env.local에 DB, Auth, 저장소(AWS_*) 환경 변수 생성
 echo "NEON_AUTH_COOKIE_SECRET=$(openssl rand -base64 32)" >> .env.local   # 세션 쿠키 키 (처음 한 번)
 npm run db:migrate   # prisma/migrations 적용 (직접 연결 URL 사용)
-npm run db:seed      # 예시 데이터 (삼국지 20명, 그리스신화 14명)
+npm run db:seed      # 공식 데이터 (그리스신화 14명, 삼국지 20명, 수호지 15명, 초한지 14명)
 npm run dev
 ```
 
