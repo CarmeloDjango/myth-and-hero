@@ -1,0 +1,142 @@
+// 영웅 도감 데이터 모델 (docs/PLAN.md 3장)
+// 런타임 연결은 src/lib/db.ts(드라이버 어댑터), 마이그레이션 연결은 prisma.config.ts에서 설정합니다.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// 세계관: 그리스신화, 삼국지, 수호지, 초한지 …
+model Series {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  description String
+  coverImage  String?
+  themeColor  String?
+  /// 능력치 라벨: {"leadership":"통솔","power":"무력","intellect":"지력","politics":"정치","charm":"매력"}
+  statLabels  Json
+  order       Int         @default(0)
+  factions    Faction[]
+  characters  Character[]
+}
+
+/// 진영/소속: 촉·위·오, 올림포스 12신, 양산박 …
+model Faction {
+  id         String      @id @default(cuid())
+  seriesId   String
+  series     Series      @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  name       String
+  /// 카드 일러스트 영역 배경색 (docs/DESIGN.md 2장)
+  color      String?
+  emblem     String?
+  characters Character[]
+
+  @@unique([seriesId, name])
+}
+
+enum Role {
+  GOD
+  HERO
+  MONSTER
+  GENERAL
+  STRATEGIST
+  RULER
+  OUTLAW
+  OTHER
+}
+
+model Character {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  seriesId     String
+  series       Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  factionId    String?
+  faction      Faction? @relation(fields: [factionId], references: [id], onDelete: SetNull)
+
+  name         String
+  originalName String?
+  title        String?
+  aliases      String[]
+  /// 이름 + 별칭 + 칭호 (서버에서 생성)
+  searchText   String
+  /// 초성 (서버에서 생성)
+  choseong     String
+
+  role         Role
+  /// 1~5성
+  rarity       Int      @default(1)
+  leadership   Int      @default(0)
+  power        Int      @default(0)
+  intellect    Int      @default(0)
+  politics     Int      @default(0)
+  charm        Int      @default(0)
+
+  summary      String
+  /// 인물 열전 (마크다운)
+  biography    String
+  funFacts     String[]
+  imageUrl     String?
+  thumbUrl     String?
+  era          String?
+
+  tags          CharacterTag[]
+  relationsFrom Relation[]     @relation("from")
+  relationsTo   Relation[]     @relation("to")
+
+  published    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([seriesId, factionId, role])
+  @@index([seriesId, name, id])
+  @@index([seriesId, leadership(sort: Desc), id])
+  @@index([seriesId, power(sort: Desc), id])
+  @@index([seriesId, intellect(sort: Desc), id])
+  @@index([seriesId, politics(sort: Desc), id])
+  @@index([seriesId, charm(sort: Desc), id])
+}
+
+/// 특기: 궁술, 지략, 바다, 변신 …
+model Tag {
+  id         String         @id @default(cuid())
+  name       String         @unique
+  characters CharacterTag[]
+}
+
+model CharacterTag {
+  characterId String
+  tagId       String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([characterId, tagId])
+}
+
+enum RelationType {
+  PARENT
+  CHILD
+  SPOUSE
+  SIBLING
+  SWORN_BROTHER
+  LORD
+  SUBORDINATE
+  RIVAL
+  MENTOR
+}
+
+model Relation {
+  id     String       @id @default(cuid())
+  fromId String
+  toId   String
+  type   RelationType
+  note   String?
+  from   Character    @relation("from", fields: [fromId], references: [id], onDelete: Cascade)
+  to     Character    @relation("to", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId, type])
+}
