@@ -33,6 +33,16 @@ npm run dev
 | 앱 런타임 (`src/lib/db.ts`) | `DATABASE_URL` | 풀링(`-pooler`) 연결 + pg Pool. Vercel에서는 `attachDatabasePool`로 유휴 연결을 정리 |
 | 마이그레이션, 시드 (`prisma.config.ts`, `prisma/seed.ts`) | `DATABASE_URL_UNPOOLED` | 직접 연결 (PgBouncer를 거치지 않음) |
 
+### Postgres 포트(5432)를 쓸 수 없는 환경
+
+일부 샌드박스처럼 HTTPS만 나갈 수 있는 곳에서는 `DATABASE_DRIVER=neon-http`를 주면 Neon serverless 드라이버의 HTTP 모드로 접속합니다.
+
+```bash
+DATABASE_DRIVER=neon-http npm run start
+```
+
+이 모드는 **트랜잭션을 지원하지 않습니다**(upsert, `$transaction`, 중첩 쓰기 불가). 화면 확인이나 읽기 위주 점검용으로만 쓰고, 배포 환경에서는 기본값(pg)을 씁니다.
+
 ## 스크립트
 
 | 명령 | 설명 |

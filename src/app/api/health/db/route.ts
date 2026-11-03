@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { getDb } from "@/lib/db";
+import { getDb, getDriver } from "@/lib/db";
 
 /**
  * Neon Postgres 연결 확인용 엔드포인트.
@@ -13,7 +13,7 @@ export async function GET() {
     const db = getDb();
     const [info] = await db.$queryRaw<
       { database: string; server_time: Date; version: string }[]
-    >`SELECT current_database() AS database, now() AS server_time, version() AS version`;
+    >`SELECT current_database()::text AS database, now() AS server_time, version()::text AS version`;
 
     const [series, characters, sample] = await Promise.all([
       db.series.count(),
@@ -34,6 +34,7 @@ export async function GET() {
 
     return Response.json({
       ok: true,
+      driver: getDriver(),
       database: info.database,
       serverTime: info.server_time,
       postgres: info.version.split(" ").slice(0, 2).join(" "),
