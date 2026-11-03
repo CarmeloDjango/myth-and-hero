@@ -57,7 +57,8 @@ export function Game({
   // 끌기: 손패 카드를 필드로, 필드 카드를 상대에게
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
-  const suppressClick = useRef(false);
+  /** 끌기가 끝난 직후 따라오는 클릭을 무시할 때까지의 시각 */
+  const suppressClickUntil = useRef(0);
   const handRef = useRef<HTMLDivElement>(null);
   // 첫 판 손가락 안내: 아이마다 첫 판이 끝날 때까지 (이 기기에 기억)
   const [learners] = useState<Set<string>>(() => {
@@ -223,30 +224,57 @@ export function Game({
     return uid && foe.board.some((u) => u.uid === uid) ? uid : null;
   };
 
+  /**
+   * 끌기 시작: 마우스·손가락·펜 모두. 움직임과 놓기는 창 전체에서 받습니다
+   * (카드 밖으로 나가도, 브라우저마다 포인터 캡처가 달라도 끊기지 않게).
+   * 마우스는 기본 동작(글자 선택·이미지 끌기)을 막아야 끌기가 시작됩니다.
+   */
   const onDragStart = (e: React.PointerEvent, d: DragStart) => {
-    if (!myTurn || e.button !== 0) return;
-    const start: Drag = { ...d, x: e.clientX, y: e.clientY, active: false, hot: false } as Drag;
-    dragRef.current = start;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    if (!myTurn || e.button !== 0 || dragRef.current) return;
+    if (e.pointerType === "mouse") e.preventDefault();
+    dragRef.current = { ...d, x: e.clientX, y: e.clientY, active: false, hot: false } as Drag;
+    const id = e.pointerId;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId === id) dragMove(ev.clientX, ev.clientY);
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      cleanup();
+      dragEnd(ev.clientX, ev.clientY);
+    };
+    const cancel = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      cleanup();
+      dragRef.current = null;
+      setDrag(null);
+    };
+    const cleanup = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
   };
-  const onDragMove = (e: React.PointerEvent) => {
+  const dragMove = (x: number, y: number) => {
     const d = dragRef.current;
     if (!d) return;
-    const moved = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 12;
+    const moved = Math.hypot(x - d.sx, y - d.sy) > 12;
     if (!d.active && !moved) return;
-    const next: Drag = { ...d, x: e.clientX, y: e.clientY, active: true, hot: false };
-    const t = dropTarget(e.clientX, e.clientY, next);
+    const next: Drag = { ...d, x, y, active: true, hot: false };
+    const t = dropTarget(x, y, next);
     next.hot = d.kind === "hand" ? t === "board" : t !== null && !checkAction(s, { type: "attack", attacker: d.uid, target: t });
     dragRef.current = next;
     setDrag(next);
   };
-  const onDragEnd = (e: React.PointerEvent) => {
+  const dragEnd = (x: number, y: number) => {
     const d = dragRef.current;
     dragRef.current = null;
     setDrag(null);
     if (!d?.active) return; // 그냥 누른 것: 원래 클릭으로
-    suppressClick.current = true;
-    const t = dropTarget(e.clientX, e.clientY, d);
+    suppressClickUntil.current = performance.now() + 400;
+    const t = dropTarget(x, y, d);
     if (d.kind === "hand") {
       if (t === "board") void act({ type: "play", handIndex: d.index });
       else playSound("nope");
@@ -256,12 +284,9 @@ export function Game({
       playSound("nope");
     }
   };
-  /** 끌고 난 뒤 따라오는 클릭은 무시 (클릭 처리 안에서만 부름) */
+  /** 끌고 난 직후 따라오는 클릭은 무시 (클릭 처리 안에서만 부름) */
   const guarded = (fn: () => void) => {
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      return;
-    }
+    if (performance.now() < suppressClickUntil.current) return;
     fn();
   };
 
@@ -327,7 +352,7 @@ export function Game({
   const playedNow = fx.events.find((e): e is Extract<BattleEvent, { type: "play" }> => e.type === "play");
 
   return (
-    <div className="flex flex-col gap-3" data-battle-turn={s.turn} data-battle-bottom={bottom} data-battle-winner={s.winner ?? undefined}>
+    <div className="flex select-none flex-col gap-3" data-battle-turn={s.turn} data-battle-bottom={bottom} data-battle-winner={s.winner ?? undefined}>
       <PlayerBar
         seat={seats[top]}
         side={top}
@@ -389,12 +414,6 @@ export function Game({
                   const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
                   onDragStart(e, { kind: "unit", uid: u.uid, sx: e.clientX, sy: e.clientY, fx: r.left + r.width / 2, fy: r.top + r.height / 2 });
                 },
-                onPointerMove: onDragMove,
-                onPointerUp: onDragEnd,
-                onPointerCancel: () => {
-                  dragRef.current = null;
-                  setDrag(null);
-                },
               }
             : null
         }
@@ -436,12 +455,7 @@ export function Game({
               data-hand={i}
               aria-label={`${c.name} 내기 (비용 ${c.cost}, 공격 ${c.attack}, 체력 ${c.health})`}
               onPointerDown={playable ? (e) => onDragStart(e, { kind: "hand", index: i, card: c, sx: e.clientX, sy: e.clientY }) : undefined}
-              onPointerMove={playable ? onDragMove : undefined}
-              onPointerUp={playable ? onDragEnd : undefined}
-              onPointerCancel={() => {
-                dragRef.current = null;
-                setDrag(null);
-              }}
+              onDragStart={(e) => e.preventDefault()}
               onClick={() =>
                 guarded(() => {
                   setSelected(null);
@@ -576,7 +590,7 @@ function PlayerBar({
     >
       {l.imageSrc ? (
         // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림
-        <img src={l.imageSrc} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" />
+        <img src={l.imageSrc} alt="" draggable={false} className="absolute inset-0 h-full w-full rounded-full object-cover" />
       ) : (
         <span className="font-display text-3xl">{l.name[0]}</span>
       )}
@@ -670,7 +684,7 @@ function Board({
   glow?: boolean;
   /** 방금 낸 카드 (특별한 힘 연출) */
   playedUid?: string | null;
-  dragHandlers?: (u: Unit) => Pick<React.DOMAttributes<HTMLButtonElement>, "onPointerDown" | "onPointerMove" | "onPointerUp" | "onPointerCancel"> | null;
+  dragHandlers?: (u: Unit) => Pick<React.DOMAttributes<HTMLButtonElement>, "onPointerDown"> | null;
   units: Unit[];
   fxId: number;
   damageOn: (uid: string) => { amount: number }[];
@@ -700,6 +714,7 @@ function Board({
             type="button"
             data-uid={u.uid}
             {...(handlers ?? {})}
+            onDragStart={(e) => e.preventDefault()}
             onClick={() => onTap(u)}
             aria-label={`${u.card.name} (공격 ${u.attack}, 체력 ${u.health})${target ? " 공격하기" : ready ? " 공격할 카드로 고르기" : ""}`}
             aria-pressed={sel || undefined}
