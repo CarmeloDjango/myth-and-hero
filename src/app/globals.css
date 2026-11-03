@@ -79,3 +79,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .battle-anim { animation: none !important; }
 }
+/* 카드 배틀 첫 판 손가락 안내 */
+@keyframes tap-hint {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
