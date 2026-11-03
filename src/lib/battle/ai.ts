@@ -7,7 +7,14 @@
 import { DECK_SIZE, type CardDef } from "./cards";
 import { checkAction, hasGuard, shuffle, type Action, type BattleState } from "./engine";
 
-export function nextToriAction(s: BattleState): Action {
+export type ToriLevel = "easy" | "normal";
+
+/**
+ * level "easy"(기본): 낼 카드를 아무거나 고르고, 대장을 주로 때리고, 유리한 교환은 가끔만 (2학년이 이길 만큼)
+ * level "normal": 가장 비싼 카드부터, 유리한 교환을 놓치지 않음
+ * rnd: 테스트·시뮬레이션에서 같은 결과를 내기 위한 난수
+ */
+export function nextToriAction(s: BattleState, level: ToriLevel = "easy", rnd: () => number = Math.random): Action {
   const me = s.players[s.turn];
   const foe = s.players[1 - s.turn];
   const ready = me.board.filter((u) => u.ready);
@@ -22,6 +29,7 @@ export function nextToriAction(s: BattleState): Action {
   const playable = me.hand
     .map((card, handIndex) => ({ card, handIndex }))
     .filter(({ handIndex }) => ok({ type: "play", handIndex }));
+  if (playable.length && level === "easy") return { type: "play", handIndex: playable[Math.floor(rnd() * playable.length)].handIndex };
   if (playable.length) {
     const score = (c: CardDef) => c.cost * 10 + (c.ability === "divine" ? foe.board.length * 6 : 0) + (c.ability === "guard" && me.leader.hp <= 10 ? 8 : 0);
     playable.sort((a, b) => score(b.card) - score(a.card));
@@ -37,6 +45,8 @@ export function nextToriAction(s: BattleState): Action {
       if (best) return { type: "attack", attacker: u.uid, target: best.uid };
       continue;
     }
+    // 쉬운 토리는 열에 일곱은 그냥 대장을 때림
+    if (level === "easy" && rnd() < 0.7) return { type: "attack", attacker: u.uid, target: "leader" };
     // 이기고 살아남는 교환, 아니면 강한 카드와 맞바꾸기
     const win = targets.filter((t) => t.health <= u.attack && t.attack < u.health).sort((a, b) => b.attack - a.attack)[0];
     if (win) return { type: "attack", attacker: u.uid, target: win.uid };

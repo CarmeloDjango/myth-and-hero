@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cardTint } from "@/lib/characters/browse";
-import { cardStats, KIND_ABILITY, type CardDef } from "@/lib/battle/cards";
+import { cardStatsFor, KIND_ABILITY, type CardDef } from "@/lib/battle/cards";
 import { getDb } from "@/lib/db";
 import { characterPictureSrc, heroImageSrc, isPhotoPicture } from "@/lib/heroes/image";
 
@@ -17,8 +17,8 @@ export async function getBattlePool(familyId: string): Promise<CardDef[]> {
     orderBy: [{ name: "asc" }],
     select: {
       id: true,
+      slug: true,
       name: true,
-      rarity: true,
       stat1: true,
       stat2: true,
       stat3: true,
@@ -36,6 +36,8 @@ export async function getBattlePool(familyId: string): Promise<CardDef[]> {
   return rows.map((r) => {
     const picture = r.familyPictures[0]?.imageUrl;
     const kindName = r.kind?.name ?? null;
+    // 특별한 힘은 공식 세계관의 종류에만 (아이가 만든 세계관의 "영웅" 종류는 이름만 같을 수 있음)
+    const ability = kindName && r.series.familyId === null ? (KIND_ABILITY[kindName] ?? null) : null;
     return {
       id: r.id,
       name: r.name,
@@ -46,9 +48,8 @@ export async function getBattlePool(familyId: string): Promise<CardDef[]> {
       seriesName: r.series.name,
       isFamily: r.familyId !== null,
       creatorId: r.creatorId,
-      // 특별한 힘은 공식 세계관의 종류에만 (아이가 만든 세계관의 "영웅" 종류는 이름만 같을 수 있음)
-      ability: kindName && r.series.familyId === null ? (KIND_ABILITY[kindName] ?? null) : null,
-      ...cardStats(r.rarity, [r.stat1, r.stat2, r.stat3, r.stat4, r.stat5]),
+      ability,
+      ...cardStatsFor({ slug: r.slug, official: r.familyId === null, stats: [r.stat1, r.stat2, r.stat3, r.stat4, r.stat5], ability }),
     };
   });
 }

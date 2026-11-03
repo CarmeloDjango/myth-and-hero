@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { cardStats } = await import("../src/lib/battle/cards");
+const { familyCardStats, KIND_ABILITY, OFFICIAL_CARDS, RULES, STAT_CAP, statBudget } = await import("../src/lib/battle/cards");
+const { SEED_SERIES } = await import("../prisma/seed-data");
 const { applyAction, checkAction, legalActions, newBattle } = await import("../src/lib/battle/engine");
 const { buildDeck, nextToriAction } = await import("../src/lib/battle/ai");
 type CardDef = import("../src/lib/battle/cards").CardDef;
@@ -21,25 +22,48 @@ function arrange(s: BattleState, side: 0 | 1, part: Partial<BattleState["players
 }
 const unit = (uid: string, c: CardDef, ready = true) => ({ uid, card: c, attack: c.attack, health: c.health, maxHealth: c.health, ready });
 
-test("카드 숫자: 비용=별-1, 힘의 합=비용×2+3, 한 가지만 높으면 공격 쪽", () => {
-  assert.deepEqual(cardStats(5, [95, 97, 75, 62, 93]), { cost: 4, attack: 5, health: 6 }); // 관우: 골고루
-  assert.deepEqual(cardStats(4, [85, 98, 30, 22, 45]), { cost: 3, attack: 7, health: 2 }); // 장비: 무력만
-  assert.deepEqual(cardStats(1, [10, 0, 0, 0, 0]), { cost: 1, attack: 4, health: 1 }, "비용 최소 1");
-  for (const r of [1, 2, 3, 4, 5, 9]) {
-    const c = cardStats(r, [50, 60, 70, 80, 90]);
-    assert.equal(c.attack + c.health, c.cost * 2 + 3);
-    assert.ok(c.cost >= 1 && c.cost <= 4 && c.attack >= 1 && c.health >= 1);
+test("공식 카드: 모든 시드 인물이 표에 있고, 힘의 합이 곡선에 맞고, 최대 6", () => {
+  const seeded = SEED_SERIES.flatMap((ser) => ser.characters);
+  assert.equal(Object.keys(OFFICIAL_CARDS).length, seeded.length);
+  for (const c of seeded) {
+    const card = OFFICIAL_CARDS[c.slug];
+    assert.ok(card, `${c.name} 카드 없음`);
+    const [cost, attack, health] = card;
+    assert.equal(attack + health, statBudget(cost, !!KIND_ABILITY[c.kind]), `${c.name} ${cost}/${attack}/${health}`);
+    assert.ok(attack >= 1 && health >= 1 && attack <= STAT_CAP && health <= STAT_CAP, c.name);
   }
+  const perCost = [1, 2, 3, 4, 5].map((k) => Object.values(OFFICIAL_CARDS).filter(([cost]) => cost === k).length);
+  assert.deepEqual(perCost, [2, 6, 11, 9, 6]);
 });
 
-test("시작: 먼저 3장+1장, 나중 4장, 첫 차례 에너지 2", () => {
+test("아이 영웅 카드: 능력치 합으로 비용, 곡선·한도 지킴", () => {
+  assert.equal(familyCardStats([100, 100, 100, 50, 0], false).cost, 5, "350점 가득");
+  assert.equal(familyCardStats([50, 50, 50, 50, 50], false).cost, 4, "250점");
+  assert.equal(familyCardStats([10, 0, 0, 0, 0], false).cost, 1);
+  for (const stats of [[100, 100, 100, 50, 0], [70, 70, 70, 70, 70], [100, 0, 0, 0, 0], [0, 0, 0, 0, 0]]) {
+    for (const ab of [true, false]) {
+      const c = familyCardStats(stats, ab);
+      assert.equal(c.attack + c.health, statBudget(c.cost, ab), JSON.stringify({ stats, ab, c }));
+      assert.ok(c.attack <= STAT_CAP && c.health <= STAT_CAP && c.attack >= 1 && c.health >= 1);
+    }
+  }
+  const spiky = familyCardStats([100, 100, 100, 50, 0], false);
+  const even = familyCardStats([70, 70, 70, 70, 70], false);
+  assert.ok(spiky.attack > even.attack, "한 가지만 높으면 공격 쪽");
+});
+
+test("시작: 먼저 3장+1장, 나중 4장, 첫 차례 에너지 1, 나중 쪽은 첫 차례 보너스", () => {
   const deck = Array.from({ length: 10 }, () => card(1, 1, 1));
   const s = newBattle(setup("나", deck), setup("토리", deck), 42);
   assert.equal(s.turn, 0);
   assert.equal(s.players[0].hand.length, 4);
   assert.equal(s.players[1].hand.length, 4);
-  assert.equal(s.players[0].energy, 2);
-  assert.equal(s.players[0].leader.hp, 20);
+  assert.equal(s.players[0].energy, RULES.startEnergy);
+  assert.equal(s.players[0].leader.hp, RULES.leaderHp);
+  const t = applyAction(s, { type: "end" });
+  assert.equal(t.players[1].energy, RULES.startEnergy + RULES.secondBonus, "나중 쪽 첫 차례 보너스");
+  const u = applyAction(applyAction(t, { type: "end" }), { type: "end" });
+  assert.equal(u.players[1].energy, u.players[1].maxEnergy, "보너스는 한 번만");
   // 같은 seed면 같은 손패
   assert.deepEqual(newBattle(setup("나", deck), setup("토리", deck), 42).players[0].hand.map((c) => c.id), s.players[0].hand.map((c) => c.id));
 });
@@ -80,7 +104,7 @@ test("공격: 카드끼리 서로 피해, 쓰러지면 사라짐, 대장 공격"
   assert.equal(s.players[0].board[0].ready, false, "한 차례에 한 번");
   s = arrange(s, 0, { board: [{ ...s.players[0].board[0], ready: true }] });
   s = applyAction(s, { type: "attack", attacker: "x", target: "leader" });
-  assert.equal(s.players[1].leader.hp, 17);
+  assert.equal(s.players[1].leader.hp, RULES.leaderHp - 3);
 });
 
 test("지키기: 지키기 카드부터 공격해야 함", () => {
@@ -110,6 +134,16 @@ test("꾀는 1장 더 뽑고, 신의 힘은 상대 카드 모두에게 1 피해"
   s = applyAction(s, { type: "play", handIndex: s.players[0].hand.findIndex((c) => c.ability === "divine") });
   assert.deepEqual(s.players[1].board.map((u) => [u.uid, u.health]), [["t", 2]]);
   assert.ok(s.events.some((e) => e.type === "death"));
+});
+
+test("위기의 힘: 대장 체력이 낮으면 차례 시작에 에너지 +1", () => {
+  const deck = Array.from({ length: 10 }, () => card(1, 1, 1));
+  let s = newBattle(setup("나", deck), setup("토리", deck), 4);
+  s = applyAction(s, { type: "end" });
+  s = arrange(s, 0, { leader: { ...s.players[0].leader, hp: RULES.crisisHp } });
+  s = applyAction(s, { type: "end" });
+  assert.equal(s.players[0].energy, s.players[0].maxEnergy + RULES.crisisEnergy);
+  assert.ok(s.events.some((e) => e.type === "crisis"));
 });
 
 test("지침: 덱이 비면 대장이 1, 2, 3… 피해", () => {
@@ -153,7 +187,7 @@ test("토리끼리 100판: 항상 규칙대로 하고, 게임이 끝남", () => 
     let s = newBattle(setup("A", buildDeck(pool, { seed: g })), setup("B", buildDeck(pool, { seed: g + 1000 })), g, (g % 2) as 0 | 1);
     let steps = 0;
     while (s.winner === null) {
-      const a = nextToriAction(s);
+      const a = nextToriAction(s, g % 2 ? "easy" : "normal");
       assert.equal(checkAction(s, a), null, `잘못된 행동 ${JSON.stringify(a)}`);
       s = applyAction(s, a);
       assert.ok(++steps < 2000, "끝나지 않는 게임");

@@ -10,7 +10,7 @@
  *
  * 상태는 바꾸지 않고 새 상태를 돌려줍니다(되돌리기·테스트가 쉬움). 섞기는 상태 안의 seed로 해서 같은 seed면 같은 게임.
  */
-import { BOARD_MAX, HAND_MAX, LEADER_HP, MAX_ENERGY, type CardDef } from "./cards";
+import { BOARD_MAX, HAND_MAX, RULES, type CardDef } from "./cards";
 
 export type Side = 0 | 1;
 
@@ -36,6 +36,8 @@ export type PlayerState = {
   maxEnergy: number;
   /** 덱이 비었을 때 다음 지침 피해 */
   fatigue: number;
+  /** 다음 차례에 한 번 더 받는 에너지 (나중에 하는 쪽 첫 차례) */
+  bonusEnergy: number;
 };
 
 /** 화면 연출용 기록 (피해 숫자, 사라지는 카드 등) */
@@ -46,7 +48,8 @@ export type BattleEvent =
   | { type: "draw"; side: Side; count: number }
   | { type: "burn"; side: Side; card: string }
   | { type: "fatigue"; side: Side; amount: number }
-  | { type: "turn"; side: Side };
+  | { type: "turn"; side: Side }
+  | { type: "crisis"; side: Side };
 
 export type BattleState = {
   players: [PlayerState, PlayerState];
@@ -90,16 +93,18 @@ export function newBattle(p0: PlayerSetup, p1: PlayerSetup, seed: number, first:
   const rng = { seed };
   const mk = (p: PlayerSetup): PlayerState => ({
     name: p.name,
-    leader: { ...p.leader, hp: LEADER_HP, maxHp: LEADER_HP },
+    leader: { ...p.leader, hp: RULES.leaderHp, maxHp: RULES.leaderHp },
     deck: shuffle(p.deck, rng),
     hand: [],
     board: [],
     energy: 0,
     maxEnergy: 0,
     fatigue: 1,
+    bonusEnergy: 0,
   });
   let s: BattleState = { players: [mk(p0), mk(p1)], turn: first, turnNo: 0, winner: null, seed: rng.seed, nextUid: 1, events: [] };
   const second = (1 - first) as Side;
+  s = setPlayer(s, second, { ...s.players[second], bonusEnergy: RULES.secondBonus });
   s = drawCards(s, first, 3);
   s = drawCards(s, second, 4);
   return startTurn({ ...s, events: [] }, first);
@@ -153,11 +158,14 @@ function checkWinner(s: BattleState): BattleState {
 
 function startTurn(s: BattleState, side: Side): BattleState {
   const p = s.players[side];
-  // 첫 차례부터 2: 가장 싼 카드(비용 1~2)를 바로 낼 수 있게
-  const maxEnergy = Math.min(MAX_ENERGY, Math.max(2, p.maxEnergy + 1));
-  s = setPlayer(s, side, { ...p, maxEnergy, energy: maxEnergy, board: p.board.map((u) => ({ ...u, ready: true })) });
+  const maxEnergy = Math.min(RULES.maxEnergy, Math.max(RULES.startEnergy, p.maxEnergy + 1));
+  // 위기의 힘: 대장 체력이 낮으면 뒤집을 기회 (에너지나 카드를 더)
+  const crisis = RULES.crisisHp > 0 && p.leader.hp <= RULES.crisisHp;
+  const extra = p.bonusEnergy + (crisis ? RULES.crisisEnergy : 0);
+  s = setPlayer(s, side, { ...p, maxEnergy, energy: maxEnergy + extra, bonusEnergy: 0, board: p.board.map((u) => ({ ...u, ready: true })) });
   s = { ...s, turn: side, turnNo: s.turnNo + 1, events: [...s.events, { type: "turn", side }] };
-  return drawCards(s, side, 1);
+  if (crisis) s = { ...s, events: [...s.events, { type: "crisis", side }] };
+  return drawCards(s, side, 1 + (crisis ? RULES.crisisDraw : 0));
 }
 
 function removeDead(s: BattleState): BattleState {

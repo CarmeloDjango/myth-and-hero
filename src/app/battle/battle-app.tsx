@@ -164,12 +164,19 @@ function Game({ initial, onAgain, onChangeLeader }: { initial: BattleState; onAg
   const canTarget = (target: string) => myTurn && selected !== null && !checkAction(s, { type: "attack", attacker: selected, target });
   const onlyEnd = myTurn && legalActions(s).length === 1;
 
+  const crisisNow = fx.events.some((e) => e.type === "crisis" && e.side === s.turn);
+  // 나중에 시작한 쪽의 첫 차례 보너스 (지금은 아이가 늘 먼저라 토리만 받지만, 둘이 대결에서 씀)
+  const bonusNow = !crisisNow && s.players[s.turn].energy > s.players[s.turn].maxEnergy;
   const guide = !myTurn
     ? s.winner === null
       ? "토리 차례… 🤔"
       : ""
     : notice ??
-      (selected
+      (crisisNow
+        ? "위기의 힘! 체력이 낮아서 에너지를 1 더 받았어요 ⚡"
+        : bonusNow
+          ? "나중에 시작해서 에너지를 1 더 받았어요 ⚡"
+          : selected
         ? "누구를 공격할까요? 반짝이는 곳을 눌러요."
         : onlyEnd
           ? "할 수 있는 게 다 끝났어요. '차례 끝'을 눌러요."
@@ -330,8 +337,15 @@ function PlayerBar({
         </span>
       </div>
       <div className="flex items-center gap-1" aria-label={`에너지 ${player.energy} / ${player.maxEnergy}`}>
-        {Array.from({ length: player.maxEnergy }, (_, i) => (
-          <span key={i} aria-hidden="true" className={`flex size-7 items-center justify-center rounded-full text-sm ${i < player.energy ? "bg-blue text-paper" : "bg-line text-muted"}`}>
+        {/* 보너스·위기의 힘으로 받은 에너지는 노란 칸으로 더 보여줍니다 */}
+        {Array.from({ length: Math.max(player.maxEnergy, player.energy) }, (_, i) => (
+          <span
+            key={i}
+            aria-hidden="true"
+            className={`flex size-7 items-center justify-center rounded-full text-sm ${
+              i >= player.energy ? "bg-line text-muted" : i >= player.maxEnergy ? "bg-yellow text-ink" : "bg-blue text-paper"
+            }`}
+          >
             ⚡
           </span>
         ))}
