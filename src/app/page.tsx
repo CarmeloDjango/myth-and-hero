@@ -32,6 +32,19 @@ async function SeriesGrid() {
   }
 
   return (
+    <div className="flex flex-col gap-6">
+    <Link
+      href="/me/heroes/new"
+      className="sticker pressable flex flex-wrap items-center justify-between gap-4 rounded-card bg-green-soft px-6 py-5 transition-transform hover:-translate-y-1"
+    >
+      <span className="flex flex-col gap-1">
+        <span className="font-display text-[32px] leading-tight text-green-ink">나만의 영웅 만들기</span>
+        <span className="text-[17px] font-medium text-ink">{viewer.profile.nickname}만의 영웅을 그리고 도감에 넣어 봐요!</span>
+      </span>
+      <span className="inline-flex min-h-12 items-center rounded-button border-b-4 border-green-dark bg-green px-5 font-bold text-paper">
+        만들기 →
+      </span>
+    </Link>
     <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
       {list.map((s) => (
         <Link
@@ -57,6 +70,7 @@ async function SeriesGrid() {
           </span>
         </Link>
       ))}
+    </div>
     </div>
   );
 }

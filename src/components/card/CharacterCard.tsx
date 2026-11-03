@@ -23,9 +23,14 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
   return (
     <article className="sticker relative flex flex-col overflow-hidden rounded-card bg-paper transition-transform hover:-translate-y-1">
       <div className="relative flex h-[220px] items-center justify-center" style={{ background: tint }}>
-        <span aria-hidden="true" className="font-display text-[120px] leading-none text-ink opacity-15">
-          {glyph}
-        </span>
+        {c.imageSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림 (라우트 핸들러에서 권한 확인)
+          <img src={c.imageSrc} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain" />
+        ) : (
+          <span aria-hidden="true" className="font-display text-[120px] leading-none text-ink opacity-15">
+            {glyph}
+          </span>
+        )}
         <span
           className="absolute left-3 top-3 rounded-button border-2 border-yellow bg-paper px-2.5 py-1 text-[13px] font-black"
           aria-label={`${c.rarity}성`}

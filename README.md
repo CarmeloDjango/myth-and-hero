@@ -9,7 +9,7 @@
 
 - Next.js 16 (App Router, Cache Components)
 - Prisma 7 + `@prisma/adapter-pg` (node-postgres)
-- Neon Postgres + Neon Auth (Managed Better Auth) — `neon.ts`로 서비스 선언
+- Neon Postgres + Neon Auth (Managed Better Auth) + Neon Object Storage — `neon.ts`로 서비스 선언
 - Tailwind CSS v4
 
 ## 처음 세팅하기
@@ -18,7 +18,7 @@
 npm install
 npm i -g neon@latest
 neon login
-neon deploy          # neon.ts 적용 + .env.local에 DATABASE_URL(_UNPOOLED), NEON_AUTH_BASE_URL 생성
+neon deploy          # neon.ts 적용 + .env.local에 DB, Auth, 저장소(AWS_*) 환경 변수 생성
 echo "NEON_AUTH_COOKIE_SECRET=$(openssl rand -base64 32)" >> .env.local   # 세션 쿠키 키 (처음 한 번)
 npm run db:migrate   # prisma/migrations 적용 (직접 연결 URL 사용)
 npm run db:seed      # 예시 데이터 (삼국지 20명, 그리스신화 14명)
@@ -77,3 +77,21 @@ Neon 대신 로컬 Postgres에 마이그레이션과 시드를 적용해 기본(
 ```bash
 DATABASE_URL=postgresql://postgres@127.0.0.1:5432/hero DATABASE_URL_UNPOOLED=postgresql://postgres@127.0.0.1:5432/hero npm run db:migrate
 ```
+
+## 환경 변수 (Vercel에도 같은 이름으로)
+
+| 이름 | 어디서 |
+|---|---|
+| `DATABASE_URL`, `DATABASE_URL_UNPOOLED` | Neon 콘솔 → Connect (풀링 켬 / 끔) |
+| `NEON_AUTH_BASE_URL` | Neon 콘솔 → Auth |
+| `NEON_AUTH_COOKIE_SECRET` | 직접 만든 32자 이상 무작위 문자열 |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION` | 아이 그림 저장소(`drawings` 버킷). `neon deploy`/`neon env pull` 후 `.env.local`에서 복사 |
+
+## 테스트
+
+```bash
+# 테스트 전용 DB (마이그레이션 + 시드 적용된 로컬 Postgres 등). 운영 Neon DB는 거부합니다.
+TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/hero_test npm run test:db
+```
+
+`tests/heroes.service.test.mts`: 영웅 만들기의 소유권, 능력치 250점 규칙, 가족 공개 범위, 그림 버전 관리, 부모 모드 숨기기·지우기를 확인합니다 (그림 저장소는 메모리로 대체).

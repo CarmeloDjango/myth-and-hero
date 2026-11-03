@@ -87,6 +87,7 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
                 stats={c.stats}
                 labels={labels}
                 motto={c.summary}
+                imageSrc={c.imageSrc}
               />
             </div>
 
@@ -105,6 +106,11 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
               <p className="text-2xl font-bold">
                 {[c.originalName, c.title].filter(Boolean).join(" · ")}
               </p>
+              {c.isFamily ? (
+                <p className="w-fit rounded-button border-2 border-green bg-green-soft px-3 py-1 text-[15px] font-bold text-green-ink">
+                  {c.creatorNickname ? `${c.creatorNickname}이(가) 만든 나만의 카드` : "우리 가족이 만든 나만의 카드"}
+                </p>
+              ) : null}
               <p className="max-w-[520px] text-[19px] font-medium leading-relaxed text-muted">{c.summary}</p>
               <div className="flex flex-wrap gap-3 pt-2">
                 <ReadAloudButton text={readText} />

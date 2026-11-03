@@ -12,9 +12,11 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test:db": "tsx --conditions=react-server --test tests/*.test.mts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1161.0",
     "@neon/auth": "^0.8.2",
     "@neon/config": "^1.10.0",
     "@neon/env": "^1.6.8",
@@ -26,6 +28,7 @@
     "@vercel/functions": "^3.10.5",
     "next": "16.4.4",
     "nuqs": "^2.10.2",
+    "perfect-freehand": "^1.2.3",
     "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",

@@ -39,6 +39,14 @@ async function ViewerBadge() {
     <>
       {viewer.profile ? (
         <Link
+          href="/me/heroes"
+          className="sticker pressable inline-flex min-h-12 items-center rounded-button px-4 text-[15px] font-bold tracking-[0.053em] text-muted hover:bg-paper-dim"
+        >
+          내 영웅
+        </Link>
+      ) : null}
+      {viewer.profile ? (
+        <Link
           href="/me"
           aria-label={`${viewer.profile.nickname}(으)로 보는 중. 다른 사람으로 바꾸기`}
           className="sticker pressable inline-flex min-h-12 items-center gap-2 rounded-button py-1 pl-1.5 pr-4 text-[15px] font-bold hover:bg-paper-dim"

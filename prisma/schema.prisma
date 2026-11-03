@@ -131,6 +131,7 @@ model Character {
   /// 인물 열전 (빈 줄로 문단 구분)
   biography    String
   funFacts     String[]
+  /// 공식 인물: 이미지 URL / 아이가 만든 영웅: 그림 PNG의 저장소 키
   imageUrl     String?
   thumbUrl     String?
   era          String?
@@ -147,8 +148,10 @@ model Character {
   hidden       Boolean        @default(false)
   /// 꾸미기 파츠 조합
   avatarParts  Json?
-  /// 그리기 획 데이터 JSON (Object Storage)
+  /// 그리기 획 데이터 JSON의 저장소 키 (Object Storage `drawings` 버킷)
   strokesUrl   String?
+  /// 영웅 마법사 입력값 (이야기 빈칸 답 등). 다시 고칠 때 채워 넣기 위해 보관합니다.
+  wizardData   Json?
 
   tags          CharacterTag[]
   relationsFrom Relation[]     @relation("from")

@@ -84,6 +84,10 @@ export type CharacterDetail = {
   faction: { name: string; color: string | null } | null;
   /** 아이가 만든 카드("나만의 카드")인지 */
   isFamily: boolean;
+  /** 아이가 그린 그림 주소 (없으면 null) */
+  imageSrc: string | null;
+  /** 만든 아이 별명 (나만의 카드일 때) */
+  creatorNickname: string | null;
   series: { slug: string; name: string; statLabels: StatLabels };
   related: RelatedCharacter[];
   prev: { slug: string; name: string } | null;

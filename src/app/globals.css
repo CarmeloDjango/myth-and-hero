@@ -49,3 +49,10 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
+
+/* 영웅 완성 화면: 카드가 톡 튀어나오기 */
+@keyframes pop {
+  0% { transform: scale(0.6) rotate(-6deg); opacity: 0; }
+  70% { transform: scale(1.05) rotate(2deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}

@@ -7,7 +7,9 @@ import { SiteFooter, SiteHeader } from "@/components/layout/SiteChrome";
 import { CenteredPanel, SecondaryButton } from "@/components/ui/form";
 import { AVATAR_KEYS, MAX_PROFILES, type AvatarKey } from "@/lib/family/avatars";
 import { requireFamily } from "@/lib/family/viewer";
+import { heroImageSrc, listFamilyHeroes } from "@/lib/heroes/service";
 
+import { ParentHeroList } from "./hero-controls";
 import { AddProfileForm, ParentPinForm, ProfileEditor, SignOutButton } from "./parent-client";
 
 export const metadata: Metadata = { title: "부모 모드 · 영웅 도감" };
@@ -43,6 +45,18 @@ async function ParentContent() {
   }
 
   const profiles = viewer.family.profiles;
+  const heroes = (await listFamilyHeroes(viewer.family.id)).map((h) => ({
+    id: h.id,
+    slug: h.slug,
+    name: h.name,
+    status: h.status,
+    hidden: h.hidden,
+    imageSrc: heroImageSrc(h),
+    color: h.faction?.color ?? null,
+    creator: h.creator?.nickname ?? null,
+    seriesSlug: h.series.slug,
+    seriesName: h.series.name,
+  }));
   return (
     <main className="flex-1 px-6 py-12">
       <div className="mx-auto flex max-w-[960px] flex-col gap-8">
@@ -71,9 +85,12 @@ async function ParentContent() {
           </div>
         </section>
 
-        <section aria-labelledby="coming" className="flex flex-col gap-2 rounded-card bg-paper-dim p-5">
-          <h2 id="coming" className="text-xl font-bold">곧 생길 기능</h2>
-          <p className="font-medium text-muted">아이가 만든 영웅과 세계관 숨기기·지우기는 영웅 만들기(H1)와 함께 여기에 추가돼요.</p>
+        <section aria-labelledby="heroes" className="flex flex-col gap-4">
+          <h2 id="heroes" className="text-[32px] font-bold">
+            아이들이 만든 영웅 ({heroes.length})
+          </h2>
+          <p className="font-medium text-muted">숨기면 도감에서 사라지고, 다시 보이기로 되돌릴 수 있어요. 지우면 그림까지 함께 지워져요.</p>
+          <ParentHeroList heroes={heroes} />
         </section>
       </div>
     </main>

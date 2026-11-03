@@ -85,6 +85,8 @@ export type CharacterCardData = {
   kindName: string | null;
   /** 아이가 만든 카드("나만의 카드")인지 */
   isFamily: boolean;
+  /** 아이가 그린 그림 주소 (없으면 null) */
+  imageSrc: string | null;
 };
 
 export type CharacterPage = {
