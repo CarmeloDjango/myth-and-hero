@@ -81,25 +81,26 @@ export function statBudget(cost: number, hasAbility: boolean): number {
 /**
  * 공식 인물 카드 (slug → 비용/공격/체력). 비용별 장수: 1:4, 2:10, 3:20, 4:18, 5:11
  * 특별한 힘은 종류에서 (장수·영웅 🛡️, 괴물·호걸 💨, 책사 📜, 신·도사 ✨, 군주·두령 없음).
- * 몇 명은 시드에서 따로 정합니다(seed-data의 ability: 항우·번쾌·하후영 💨, 대종·연청 📜).
- * 시뮬레이션(docs/BATTLE.md)으로 삼국지·수호지·초한지 한 세계관 덱끼리 45~57%가 되게 맞췄습니다.
+ * 몇 명은 시드에서 따로 정합니다(seed-data의 ability):
+ *   그리스신화 아테나 📜, 포세이돈 🛡️, 하데스 없음, 아폴론 🔥, 아르테미스·헤르메스 💨 / 초한지 항우·번쾌·하후영 💨 / 수호지 대종·연청 📜
+ * 시뮬레이션(docs/BATTLE.md)으로 네 세계관의 한 세계관 덱끼리 46~57%가 되게 맞췄습니다.
  */
 export const OFFICIAL_CARDS: Record<string, [cost: number, attack: number, health: number]> = {
   // 그리스신화
-  zeus: [5, 5, 5], // ✨ 천둥의 신
-  athena: [5, 4, 6], // ✨ 지혜
+  zeus: [5, 4, 6], // ✨ 천둥의 신 (그리스신화에서 ✨는 제우스만)
+  athena: [5, 4, 6], // 📜 지혜
   heracles: [5, 4, 6], // 🛡️ 열두 과업
-  poseidon: [4, 4, 4], // ✨
-  hades: [4, 5, 3], // ✨
-  achilles: [4, 4, 4], // 🛡️
-  apollo: [3, 3, 3], // ✨
-  artemis: [3, 4, 2], // ✨ 사냥꾼
-  perseus: [3, 3, 3], // 🛡️
+  poseidon: [4, 3, 5], // 🛡️ 바다의 벽
+  hades: [4, 4, 5], // 힘 없음 (조용한 저승의 왕)
+  achilles: [4, 3, 5], // 🛡️
+  apollo: [3, 2, 4], // 🔥 태양
+  artemis: [3, 2, 4], // 💨 사냥꾼
+  perseus: [3, 2, 4], // 🛡️
   theseus: [3, 2, 4], // 🛡️
-  minotaur: [3, 4, 2], // 💨 황소
+  minotaur: [3, 3, 3], // 💨 황소
   odysseus: [2, 2, 2], // 🛡️
-  medusa: [2, 3, 1], // 💨
-  hermes: [1, 1, 1], // ✨ 빠른 전령
+  medusa: [2, 1, 3], // 💨
+  hermes: [1, 1, 1], // 💨 빠른 전령
   // 삼국지
   "guan-yu": [5, 5, 5], // 🛡️ 미염공
   "lu-bu": [5, 6, 4], // 🛡️ 천하제일 무장

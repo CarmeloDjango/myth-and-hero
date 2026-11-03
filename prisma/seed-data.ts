@@ -22,7 +22,7 @@ type CharacterSeed = {
   /** 세계관의 kinds 중 하나 */
   kind: string;
   /** 카드 배틀 특별한 힘을 종류와 다르게 줄 때 (src/lib/battle/cards.ts의 KIND_ABILITY) */
-  ability?: "guard" | "charge" | "scheme" | "divine" | "fire";
+  ability?: "guard" | "charge" | "scheme" | "divine" | "fire" | "none";
   rarity: number;
   stats: Stats;
   summary: string;
@@ -131,12 +131,12 @@ const GREEK: SeriesSeed = {
   factions: [],
   characters: [
     { slug: "zeus", name: "제우스", title: "천둥의 신", kind: GOD, rarity: 5, stats: [70, 63, 51, 57, 59], summary: "올림포스 신들의 왕. 하늘을 다스리고 번개를 던져요.", biography: "제우스는 하늘과 번개를 다스리는 신들의 왕이에요.\n\n아주 옛날, 거인 티탄들이 세상을 다스리던 때에 제우스는 형제자매들과 힘을 합쳐 티탄들을 물리쳤어요.\n\n그 뒤 형 포세이돈은 바다를, 하데스는 땅속 세계를 맡고, 제우스는 하늘과 올림포스산을 맡았어요.", funFacts: ["제우스의 상징 동물은 독수리예요."] },
-    { slug: "athena", name: "아테나", title: "지혜의 여신", kind: GOD, rarity: 5, stats: [59, 51, 70, 63, 57], summary: "지혜와 전쟁 전략의 여신. 영웅들을 몰래 도와주었어요.", funFacts: ["아테네라는 도시 이름이 아테나에게서 왔어요."] },
-    { slug: "poseidon", name: "포세이돈", title: "바다의 신", kind: GOD, rarity: 4, stats: [65, 65, 35, 46, 44], summary: "삼지창을 휘둘러 파도와 지진을 일으키는 바다의 왕이에요." },
-    { slug: "hades", name: "하데스", title: "저승의 왕", kind: GOD, rarity: 4, stats: [70, 62, 54, 39, 24], summary: "땅속 세계를 다스리는 신. 무섭게 보이지만 규칙을 잘 지켜요." },
-    { slug: "apollo", name: "아폴론", title: "태양과 음악의 신", kind: GOD, rarity: 3, stats: [45, 41, 45, 33, 55], summary: "리라를 연주하고 활을 잘 쏘는 빛나는 신이에요." },
-    { slug: "artemis", name: "아르테미스", title: "사냥의 여신", kind: GOD, rarity: 3, stats: [43, 44, 38, 50, 43], summary: "숲과 동물을 지키는 사냥의 여신. 아폴론의 쌍둥이예요." },
-    { slug: "hermes", name: "헤르메스", title: "날개 달린 전령", kind: GOD, rarity: 1, stats: [23, 15, 30, 23, 29], summary: "날개 달린 신발로 누구보다 빨리 소식을 전하는 신이에요." },
+    { slug: "athena", name: "아테나", title: "지혜의 여신", kind: GOD, ability: "scheme", rarity: 5, stats: [59, 51, 70, 63, 57], summary: "지혜와 전쟁 전략의 여신. 영웅들을 몰래 도와주었어요.", funFacts: ["아테네라는 도시 이름이 아테나에게서 왔어요."] },
+    { slug: "poseidon", name: "포세이돈", title: "바다의 신", kind: GOD, ability: "guard", rarity: 4, stats: [65, 65, 35, 46, 44], summary: "삼지창을 휘둘러 파도와 지진을 일으키는 바다의 왕이에요." },
+    { slug: "hades", name: "하데스", title: "저승의 왕", kind: GOD, ability: "none", rarity: 4, stats: [70, 62, 54, 39, 24], summary: "땅속 세계를 다스리는 신. 무섭게 보이지만 규칙을 잘 지켜요." },
+    { slug: "apollo", name: "아폴론", title: "태양과 음악의 신", kind: GOD, ability: "fire", rarity: 3, stats: [45, 41, 45, 33, 55], summary: "리라를 연주하고 활을 잘 쏘는 빛나는 신이에요." },
+    { slug: "artemis", name: "아르테미스", title: "사냥의 여신", kind: GOD, ability: "charge", rarity: 3, stats: [43, 44, 38, 50, 43], summary: "숲과 동물을 지키는 사냥의 여신. 아폴론의 쌍둥이예요." },
+    { slug: "hermes", name: "헤르메스", title: "날개 달린 전령", kind: GOD, ability: "charge", rarity: 1, stats: [23, 15, 30, 23, 29], summary: "날개 달린 신발로 누구보다 빨리 소식을 전하는 신이에요." },
     { slug: "heracles", name: "헤라클레스", title: "열두 과업의 영웅", kind: HERO, rarity: 5, stats: [50, 79, 28, 76, 61], summary: "어려운 일 열두 가지를 모두 해낸 그리스 최고의 힘센 영웅이에요.", biography: "헤라클레스는 제우스의 아들로, 그리스에서 가장 힘이 센 영웅이에요.\n\n잘못을 갚기 위해 아무도 해낼 수 없을 것 같은 열두 가지 과업을 맡았어요. 사자를 물리치고, 머리가 여러 개인 물뱀 히드라와 싸우고, 하늘을 떠받치기도 했어요.\n\n포기하지 않고 열두 가지를 모두 해낸 헤라클레스는 마침내 신들과 함께 올림포스에서 살게 되었어요.", funFacts: ["아기 때 뱀 두 마리를 맨손으로 물리쳤대요."] },
     { slug: "perseus", name: "페르세우스", title: "메두사를 이긴 영웅", kind: HERO, rarity: 3, stats: [34, 44, 41, 53, 45], summary: "거울 방패로 메두사를 직접 보지 않고 물리쳤어요." },
     { slug: "theseus", name: "테세우스", title: "미궁의 영웅", kind: HERO, rarity: 3, stats: [39, 45, 41, 53, 41], summary: "실타래를 따라 미궁을 빠져나오며 미노타우로스를 물리쳤어요." },
