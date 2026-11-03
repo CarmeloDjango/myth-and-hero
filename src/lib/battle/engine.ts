@@ -87,6 +87,20 @@ export function shuffle<T>(list: T[], state: { seed: number }): T[] {
 
 /* ───────────── 시작 ───────────── */
 
+/**
+ * 첫 손패에 첫 차례에 낼 수 있는 카드가 적어도 한 장 있도록 덱 순서를 바꿉니다.
+ * (덱에 그런 카드가 아예 없으면 그대로) — 첫 차례에 아무것도 못 하고 "차례 끝"만 누르지 않게
+ */
+function ensurePlayableOpening(deck: CardDef[], handSize: number, energy: number, rng: { seed: number }): CardDef[] {
+  if (deck.slice(0, handSize).some((c) => c.cost <= energy)) return deck;
+  const idx = deck.findIndex((c, i) => i >= handSize && c.cost <= energy);
+  if (idx < 0) return deck;
+  const swap = Math.floor(rand(rng) * Math.min(handSize, deck.length));
+  const out = [...deck];
+  [out[swap], out[idx]] = [out[idx], out[swap]];
+  return out;
+}
+
 export type PlayerSetup = { name: string; leader: Omit<Leader, "hp" | "maxHp">; deck: CardDef[] };
 
 export function newBattle(p0: PlayerSetup, p1: PlayerSetup, seed: number, first: Side = 0): BattleState {
@@ -102,8 +116,12 @@ export function newBattle(p0: PlayerSetup, p1: PlayerSetup, seed: number, first:
     fatigue: 1,
     bonusEnergy: 0,
   });
-  let s: BattleState = { players: [mk(p0), mk(p1)], turn: first, turnNo: 0, winner: null, seed: rng.seed, nextUid: 1, events: [] };
   const second = (1 - first) as Side;
+  const players = [mk(p0), mk(p1)] as [PlayerState, PlayerState];
+  // 먼저 하는 쪽은 첫 손패 3장+첫 차례 1장, 나중 쪽은 4장+보너스 에너지
+  players[first] = { ...players[first], deck: ensurePlayableOpening(players[first].deck, 4, RULES.startEnergy, rng) };
+  players[second] = { ...players[second], deck: ensurePlayableOpening(players[second].deck, 4, RULES.startEnergy + RULES.secondBonus, rng) };
+  let s: BattleState = { players, turn: first, turnNo: 0, winner: null, seed: rng.seed, nextUid: 1, events: [] };
   s = setPlayer(s, second, { ...s.players[second], bonusEnergy: RULES.secondBonus });
   s = drawCards(s, first, 3);
   s = drawCards(s, second, 4);

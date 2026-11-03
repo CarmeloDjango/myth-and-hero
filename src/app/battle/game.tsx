@@ -110,8 +110,10 @@ export function Game({
           ? "나중에 시작해서 에너지를 1 더 받았어요 ⚡"
           : selected
             ? "누구를 공격할까요? 반짝이는 곳을 눌러요."
-            : onlyEnd
-              ? "할 수 있는 게 다 끝났어요. '차례 끝'을 눌러요."
+            : onlyEnd && me.hand.length > 0 && me.energy === me.maxEnergy && !me.board.length
+              ? `지금 에너지 ⚡${me.energy}개로 낼 수 있는 카드가 없어요. 에너지는 차례마다 1개씩 늘어나요! '차례 끝'을 눌러요.`
+              : onlyEnd
+                ? "할 수 있는 게 다 끝났어요. '차례 끝'을 눌러요."
               : "카드를 눌러서 내고, 필드의 내 카드를 눌러 공격해요."));
 
   const damageOn = (side: Side, target: string) =>

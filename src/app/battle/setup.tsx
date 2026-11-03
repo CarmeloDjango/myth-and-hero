@@ -6,7 +6,7 @@ import { BattleCard } from "@/components/battle/BattleCard";
 import { ProfileAvatar } from "@/components/family/ProfileAvatar";
 import { ReadAloudButton } from "@/components/speech/ReadAloudButton";
 import { buildDeck } from "@/lib/battle/ai";
-import { ABILITIES, DECK_SIZE, type Ability, type CardDef } from "@/lib/battle/cards";
+import { ABILITIES, DECK_SIZE, RULES, type Ability, type CardDef } from "@/lib/battle/cards";
 
 import type { Loadout, Profile } from "./types";
 
@@ -134,7 +134,11 @@ export function DeckBuilder({ profile, pool, onDone, onBack }: { profile: Profil
               </span>
             ))}
           </span>
-          {avg >= 3.6 ? <span className="text-sm font-bold text-[#b42318]">비싼 카드가 많아요! 처음에 낼 카드가 없을 수 있어요</span> : null}
+          {picked.length >= 5 && !picked.some((c) => c.cost <= RULES.startEnergy) ? (
+            <span className="text-sm font-bold text-[#b42318]">⚡{RULES.startEnergy} 이하 카드가 없어요! 첫 차례에 낼 카드가 없어요</span>
+          ) : avg >= 3.6 ? (
+            <span className="text-sm font-bold text-[#b42318]">비싼 카드가 많아요! 처음에 낼 카드가 없을 수 있어요</span>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onBack} className="sticker pressable min-h-12 rounded-button bg-paper px-4 font-bold text-blue-ink">
