@@ -1,3 +1,5 @@
+import { AbilityBadge } from "@/components/battle/AbilityBadge";
+import { resolveAbility } from "@/lib/battle/cards";
 import { cardTint } from "@/lib/characters/browse";
 import { Suspense } from "react";
 import type { Metadata } from "next";
@@ -89,7 +91,17 @@ function StepBody({ hero, stepKey }: { hero: WizardHero; stepKey: (typeof WIZARD
     case "draw":
       return <DrawStep heroId={hero.id} background={tint} hasDrawing={!!hero.imageUrl} />;
     case "kind":
-      return <KindStep heroId={hero.id} kinds={hero.series.kinds} factions={hero.series.factions} kindId={hero.kindId} factionId={hero.factionId} />;
+      return (
+        <KindStep
+          heroId={hero.id}
+          kinds={hero.series.kinds}
+          factions={hero.series.factions}
+          kindId={hero.kindId}
+          factionId={hero.factionId}
+          ability={hero.ability}
+          officialSeries={hero.series.familyId === null}
+        />
+      );
     case "stats":
       return <StatsStep heroId={hero.id} labels={hero.series.statLabels} stats={hero.stats} />;
     case "story":
@@ -119,6 +131,10 @@ function StepBody({ hero, stepKey }: { hero: WizardHero; stepKey: (typeof WIZARD
               </span>
               <span className="font-display text-4xl">{hero.name}</span>
               {hero.title ? <span className="font-medium text-muted">{hero.title}</span> : null}
+              <AbilityBadge
+                withText={false}
+                ability={resolveAbility({ ability: hero.ability, kindName: kind?.name, officialSeries: hero.series.familyId === null })}
+              />
               <dl className="mt-2 grid grid-cols-5 gap-1 text-center">
                 {STAT_KEYS.map((k) => (
                   <div key={k} className="flex flex-col">

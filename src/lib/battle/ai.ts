@@ -29,9 +29,12 @@ export function nextToriAction(s: BattleState, level: ToriLevel = "easy", rnd: (
   const playable = me.hand
     .map((card, handIndex) => ({ card, handIndex }))
     .filter(({ handIndex }) => ok({ type: "play", handIndex }));
+  // 불꽃으로 상대 대장을 쓰러뜨릴 수 있으면 바로
+  const finisher = playable.find(({ card }) => card.ability === "fire" && foe.leader.hp <= 2);
+  if (finisher) return { type: "play", handIndex: finisher.handIndex };
   if (playable.length && level === "easy") return { type: "play", handIndex: playable[Math.floor(rnd() * playable.length)].handIndex };
   if (playable.length) {
-    const score = (c: CardDef) => c.cost * 10 + (c.ability === "divine" ? foe.board.length * 6 : 0) + (c.ability === "guard" && me.leader.hp <= 10 ? 8 : 0);
+    const score = (c: CardDef) => c.cost * 10 + (c.ability === "divine" ? foe.board.length * 6 : 0) + (c.ability === "fire" ? 5 : 0) + (c.ability === "guard" && me.leader.hp <= 10 ? 8 : 0);
     playable.sort((a, b) => score(b.card) - score(a.card));
     return { type: "play", handIndex: playable[0].handIndex };
   }

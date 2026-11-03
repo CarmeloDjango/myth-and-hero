@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cardTint } from "@/lib/characters/browse";
-import { cardStatsFor, KIND_ABILITY, type CardDef } from "@/lib/battle/cards";
+import { cardStatsFor, resolveAbility, type CardDef } from "@/lib/battle/cards";
 import { getDb } from "@/lib/db";
 import { characterPictureSrc, heroImageSrc, isPhotoPicture } from "@/lib/heroes/image";
 
@@ -26,6 +26,7 @@ export async function getBattlePool(familyId: string): Promise<CardDef[]> {
       stat5: true,
       familyId: true,
       creatorId: true,
+      ability: true,
       imageUrl: true,
       familyPictures: { where: { familyId }, select: { imageUrl: true }, take: 1 },
       kind: { select: { name: true, color: true } },
@@ -36,8 +37,8 @@ export async function getBattlePool(familyId: string): Promise<CardDef[]> {
   return rows.map((r) => {
     const picture = r.familyPictures[0]?.imageUrl;
     const kindName = r.kind?.name ?? null;
-    // 특별한 힘은 공식 세계관의 종류에만 (아이가 만든 세계관의 "영웅" 종류는 이름만 같을 수 있음)
-    const ability = kindName && r.series.familyId === null ? (KIND_ABILITY[kindName] ?? null) : null;
+    // 아이가 고른 힘이 있으면 그 힘, 없으면 공식 세계관의 종류에서 (아이 세계관의 종류는 없음)
+    const ability = resolveAbility({ ability: r.ability, kindName, officialSeries: r.series.familyId === null });
     return {
       id: r.id,
       name: r.name,

@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { STAT_KEYS, toStatLabels } from "@/lib/characters/browse";
 import { getDb } from "@/lib/db";
+import { isAbility } from "@/lib/battle/cards";
 import { pictureFiles, readStrokes, writePicture } from "@/lib/drawing/picture";
 import { heroNameConflict } from "@/lib/names";
 import {
@@ -97,6 +98,7 @@ export async function getHeroForWizard(ctx: HeroCtx, heroId: string, d?: Deps) {
       title: true,
       kindId: true,
       factionId: true,
+      ability: true,
       stat1: true,
       stat2: true,
       stat3: true,
@@ -109,6 +111,7 @@ export async function getHeroForWizard(ctx: HeroCtx, heroId: string, d?: Deps) {
         select: {
           slug: true,
           name: true,
+          familyId: true,
           statLabels: true,
           kinds: { select: { id: true, name: true, color: true }, orderBy: [{ order: "asc" }, { name: "asc" }] },
           factions: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
@@ -215,7 +218,7 @@ export async function skipHeroDrawing(ctx: HeroCtx, heroId: string, d?: Deps): P
 export async function saveHeroKind(
   ctx: HeroCtx,
   heroId: string,
-  input: { kindId?: string | null; factionId?: string | null },
+  input: { kindId?: string | null; factionId?: string | null; ability?: string | null },
   d?: Deps,
 ): Promise<Result> {
   const { db } = deps(d);
@@ -228,10 +231,19 @@ export async function saveHeroKind(
   ]);
   if (input.kindId && !kind) return fail("이 세계관에 없는 종류예요.");
   if (input.factionId && !faction) return fail("이 세계관에 없는 편이에요.");
+  // 특별한 힘: 고를 수 있는 힘 또는 "none"(없음). 안 보내면 그대로
+  if (input.ability !== undefined && input.ability !== null && input.ability !== "none" && !isAbility(input.ability)) {
+    return fail("없는 특별한 힘이에요.");
+  }
 
   await db.character.update({
     where: { id: hero.id },
-    data: { kindId: kind?.id ?? null, factionId: faction?.id ?? null, wizardStep: advance(hero.wizardStep, "kind") },
+    data: {
+      kindId: kind?.id ?? null,
+      factionId: faction?.id ?? null,
+      ...(input.ability !== undefined ? { ability: input.ability } : {}),
+      wizardStep: advance(hero.wizardStep, "kind"),
+    },
   });
   return { ok: true };
 }

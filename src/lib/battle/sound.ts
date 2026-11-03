@@ -4,7 +4,7 @@
  * 아이패드 Safari는 화면을 한 번 누른 뒤에야 소리를 낼 수 있어서, 첫 소리는 누른 순간에 준비합니다.
  * 끄기는 이 기기에 기억합니다.
  */
-export type SoundName = "play" | "attack" | "hit" | "leaderHit" | "death" | "divine" | "guard" | "charge" | "scheme" | "crisis" | "turn" | "win" | "lose" | "tap" | "nope";
+export type SoundName = "play" | "attack" | "hit" | "leaderHit" | "death" | "divine" | "guard" | "charge" | "scheme" | "fire" | "crisis" | "turn" | "win" | "lose" | "tap" | "nope";
 
 const MUTE_KEY = "battle-sound-muted";
 let ctx: AudioContext | null = null;
@@ -104,6 +104,10 @@ const SOUNDS: Record<SoundName, () => void> = {
   },
   guard: () => tones([{ freq: 520, dur: 0.12, type: "square", vol: 0.06 }, { freq: 780, at: 0.1, dur: 0.18, vol: 0.1 }]),
   charge: () => noise(0.35, 0.18, 0, 5000),
+  fire: () => {
+    noise(0.45, 0.25, 0, 2500);
+    tones([{ freq: 200, to: 600, dur: 0.35, type: "sawtooth", vol: 0.07 }]);
+  },
   scheme: () => tones([{ freq: 700, dur: 0.08 }, { freq: 900, at: 0.08, dur: 0.08 }, { freq: 1100, at: 0.16, dur: 0.12 }]),
   crisis: () => tones([{ freq: 200, dur: 0.18, type: "square", vol: 0.07 }, { freq: 200, at: 0.25, dur: 0.18, type: "square", vol: 0.07 }]),
   turn: () => tones([{ freq: 523, dur: 0.1, vol: 0.1 }, { freq: 784, at: 0.1, dur: 0.15, vol: 0.1 }]),
