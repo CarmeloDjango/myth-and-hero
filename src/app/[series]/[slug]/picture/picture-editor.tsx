@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { deleteCharacterPictureAction } from "@/app/actions/pictures";
 import { AutosaveDrawing } from "@/components/drawing/AutosaveDrawing";
@@ -23,15 +22,12 @@ export function PictureEditor({
   doneHref: string;
   canRemove: boolean;
 }) {
-  const router = useRouter();
   const [leaving, setLeaving] = useState(false);
   const [removing, startRemove] = useTransition();
   const [error, setError] = useState<string>();
 
-  const leave = () => {
-    router.push(doneHref);
-    router.refresh();
-  };
+  // 바뀐 그림이 바로 보이도록 화면을 새로 불러옵니다 (클라이언트 이동 + 새로고침이 겹쳐 멈추는 일 없이).
+  const leave = () => window.location.assign(doneHref);
 
   return (
     <AutosaveDrawing saveUrl={saveUrl} background={background} hasDrawing={hasDrawing} allowPhoto>
@@ -66,7 +62,7 @@ export function PictureEditor({
               disabled={leaving || !ready}
               onClick={async () => {
                 setLeaving(true);
-                if (!(await flush())) {
+                if (!(await flush().catch(() => false))) {
                   setLeaving(false);
                   return;
                 }

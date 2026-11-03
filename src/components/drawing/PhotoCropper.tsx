@@ -22,6 +22,7 @@ function analyze(img: HTMLImageElement): { frame: Frame; bg: Rgb } {
   const x = c.getContext("2d", { willReadFrequently: true })!;
   x.drawImage(img, 0, 0, aw, ah);
   const px = x.getImageData(0, 0, aw, ah).data;
+  c.width = c.height = 0; // 아이패드 캔버스 메모리 바로 돌려주기
   const bg = edgeColor(px, aw, ah);
   const f = autoFrame(px, aw, ah, bg);
   return { frame: clampFrame({ cx: f.cx / k, cy: f.cy / k, side: f.side / k }, w, h), bg };
@@ -31,19 +32,24 @@ function analyze(img: HTMLImageElement): { frame: Frame; bg: Rgb } {
 export async function renderCrop(img: HTMLImageElement, frame: Frame, bg: Rgb): Promise<Blob> {
   const c = document.createElement("canvas");
   c.width = c.height = CANVAS_SIZE;
-  const x = c.getContext("2d")!;
+  const x = c.getContext("2d");
+  if (!x) throw new Error("그림판 메모리가 부족해요. 화면을 새로고침해 주세요.");
   x.fillStyle = `rgb(${bg.join(",")})`;
   x.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   const k = CANVAS_SIZE / frame.side;
   x.imageSmoothingQuality = "high";
   x.drawImage(img, (frame.side / 2 - frame.cx) * k, (frame.side / 2 - frame.cy) * k, img.naturalWidth * k, img.naturalHeight * k);
-  let last: Blob | null = null;
-  for (const q of [0.85, 0.75, 0.65, 0.55]) {
-    last = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", q));
-    if (last && last.size <= TARGET_BYTES) return last;
+  try {
+    let last: Blob | null = null;
+    for (const q of [0.85, 0.75, 0.65, 0.55]) {
+      last = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", q));
+      if (last && last.size <= TARGET_BYTES) return last;
+    }
+    if (last && last.size <= MAX_BACKGROUND_BYTES) return last;
+    throw new Error(last ? "사진이 너무 커요." : "사진을 만들지 못했어요. 화면을 새로고침해 주세요.");
+  } finally {
+    c.width = c.height = 0; // 아이패드 캔버스 메모리 바로 돌려주기
   }
-  if (last && last.size <= MAX_BACKGROUND_BYTES) return last;
-  throw new Error("사진이 너무 커요.");
 }
 
 /**

@@ -37,12 +37,14 @@ export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imag
       className="block w-full max-w-[380px] cursor-pointer text-left [perspective:1200px]"
     >
       <span
-        className="relative block h-[540px] transition-transform duration-500 [transform-style:preserve-3d] motion-reduce:transition-none"
+        // 앞·뒷면을 같은 칸에 겹쳐서, 카드 높이는 더 큰 쪽(보통 앞면: 정사각형 그림 + 이름)에 맞춥니다.
+        className="relative grid transition-transform duration-500 [transform-style:preserve-3d] motion-reduce:transition-none"
         style={{ transform: flipped ? "rotateY(180deg)" : "none" }}
       >
         {/* 앞면 */}
-        <span className="sticker absolute inset-0 flex flex-col overflow-hidden rounded-card bg-paper [backface-visibility:hidden]">
-          <span className="relative flex flex-1 items-center justify-center" style={{ background: tint }}>
+        <span className="sticker flex flex-col overflow-hidden rounded-card bg-paper [backface-visibility:hidden] [grid-area:1/1]">
+          {/* 그림은 정사각형으로 그리므로 그림 칸도 정사각형 (위아래·양옆 여백 없음) */}
+          <span className="relative flex aspect-square items-center justify-center" style={{ background: tint }}>
             {imageSrc ? (
               // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림 (라우트 핸들러에서 권한 확인)
               <img src={imageSrc} alt={`${name} 그림`} className={`absolute inset-0 h-full w-full ${imageCover ? "object-cover" : "object-contain"}`} />
@@ -74,7 +76,7 @@ export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imag
         </span>
 
         {/* 뒷면 */}
-        <span className="absolute inset-0 flex flex-col gap-4 rounded-card border-2 border-b-4 border-blue bg-blue-soft p-7 [backface-visibility:hidden] [transform:rotateY(180deg)]">
+        <span className="flex flex-col gap-4 rounded-card border-2 border-b-4 border-blue bg-blue-soft p-7 [backface-visibility:hidden] [grid-area:1/1] [transform:rotateY(180deg)]">
           <span className="font-display text-[40px] leading-tight text-blue-ink">{name}의 비밀 카드</span>
           {STAT_ORDER.map((k) => (
             <span key={k} className="flex items-center gap-2.5">

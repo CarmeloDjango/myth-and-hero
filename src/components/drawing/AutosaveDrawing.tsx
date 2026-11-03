@@ -53,6 +53,7 @@ export function AutosaveDrawing({
   const [underlay, setUnderlay] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>("idle");
   const [photoError, setPhotoError] = useState<string>();
+  const [saveError, setSaveError] = useState<string>();
   /** 사진 맞추기 창에 띄운 사진 (새로 고른 사진이면 blob: 주소를 닫을 때 정리) */
   const [cropping, setCropping] = useState<{ img: HTMLImageElement; temp: string | null } | null>(null);
 
@@ -79,31 +80,35 @@ export function AutosaveDrawing({
     return () => URL.revokeObjectURL(underlay);
   }, [underlay]);
 
+  /** 올리기. 어떤 오류든 false를 돌려주고(멈추지 않음), 이유를 화면에 보여줍니다. */
   const upload = async (): Promise<boolean> => {
     const strokes = latest.current;
     if (!strokes) return true;
     const bg = pendingBg.current;
-    const out = await canvas.current?.exportImages();
-    if (!out) return false;
-    const { image, thumb } = out;
-    const ext = image.type === "image/jpeg" ? "jpg" : "png";
-    const body = new FormData();
-    body.set("png", image, `drawing.${ext}`);
-    if (thumb) body.set("thumb", thumb, `thumb.${ext}`);
-    body.set("strokes", JSON.stringify(strokes));
-    if (bg === "clear") body.set("clearBackground", "1");
-    else if (bg) body.set("background", bg, "background.jpg");
     setSave("saving");
+    setSaveError(undefined);
     try {
-      const res = await fetch(saveUrl, { method: "POST", body });
-      const data = (await res.json()) as { ok: boolean };
-      if (!data.ok) throw new Error();
+      const out = await canvas.current?.exportImages();
+      if (!out) throw new Error("그림을 만들지 못했어요.");
+      const { image, thumb } = out;
+      const ext = image.type === "image/jpeg" ? "jpg" : "png";
+      const body = new FormData();
+      body.set("png", image, `drawing.${ext}`);
+      if (thumb) body.set("thumb", thumb, `thumb.${ext}`);
+      body.set("strokes", JSON.stringify(strokes));
+      if (bg === "clear") body.set("clearBackground", "1");
+      else if (bg) body.set("background", bg, "background.jpg");
+      // 인터넷이 느리거나 끊겨도 30초 뒤에는 포기하고 다시 해 볼 수 있게
+      const res = await fetch(saveUrl, { method: "POST", body, signal: AbortSignal.timeout(30_000) });
+      const data = (await res.json().catch(() => ({ ok: false, error: `서버 응답 ${res.status}` }))) as { ok: boolean; error?: string };
+      if (!data.ok) throw new Error(data.error ?? "저장하지 못했어요.");
       if (latest.current === strokes) latest.current = null;
       if (pendingBg.current === bg) pendingBg.current = null;
       setSave(latest.current ? "dirty" : "saved");
       return true;
-    } catch {
+    } catch (e) {
       setSave("error");
+      setSaveError(e instanceof DOMException && e.name === "TimeoutError" ? "인터넷이 느려서 저장하지 못했어요." : e instanceof Error ? e.message : String(e));
       return false;
     }
   };
@@ -111,12 +116,14 @@ export function AutosaveDrawing({
   const flush = async () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    if (inflight.current) await inflight.current;
+    if (inflight.current) await inflight.current.catch(() => false);
     if (!latest.current) return true;
     inflight.current = upload();
-    const ok = await inflight.current;
-    inflight.current = null;
-    return ok;
+    try {
+      return await inflight.current;
+    } finally {
+      inflight.current = null;
+    }
   };
 
   const schedule = () => {
@@ -229,7 +236,7 @@ export function AutosaveDrawing({
         </div>
       )}
       <p role="status" aria-live="polite" className="text-center text-sm font-bold text-muted">
-        {save === "saving" ? "저장하는 중…" : save === "saved" ? "저장했어요 ✓" : save === "error" ? "저장하지 못했어요. 다시 해 볼게요." : save === "dirty" ? "곧 저장해요" : " "}
+        {save === "saving" ? "저장하는 중…" : save === "saved" ? "저장했어요 ✓" : save === "error" ? `저장하지 못했어요${saveError ? ` (${saveError})` : ""}. 버튼을 다시 눌러 주세요.` : save === "dirty" ? "곧 저장해요" : " "}
       </p>
       {/* flush는 버튼 클릭 같은 이벤트에서만 부릅니다 (렌더 중에 ref를 읽지 않음). */}
       {/* eslint-disable-next-line react-hooks/refs -- 위 이유로 의도적 */}

@@ -107,7 +107,7 @@ export function DrawStep({ heroId, background, hasDrawing }: { heroId: string; b
             disabled={leaving || !ready}
             onClick={async () => {
               setLeaving(true);
-              if (!(await flush())) {
+              if (!(await flush().catch(() => false))) {
                 setLeaving(false);
                 return;
               }

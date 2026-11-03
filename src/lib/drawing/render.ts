@@ -152,11 +152,36 @@ function parseHex(color: string): [number, number, number] {
 /** 밑그림 사진 (그리기 캔버스 아래에 깔리는 1024×1024 이미지) */
 export type Underlay = CanvasImageSource | null | undefined;
 
+/**
+ * 임시 캔버스는 만들 때마다 새로 만들지 않고 이름별로 하나씩 다시 씁니다.
+ * 아이패드 Safari는 캔버스 메모리 한도가 작아서, 1024px 캔버스를 저장·채우기마다 새로 만들면
+ * 한도를 넘어 getContext가 null을 돌려주고 저장이 멈춥니다.
+ */
+const scratchCanvases = new Map<string, HTMLCanvasElement>();
+export function scratchCanvas(name: string, size = CANVAS_SIZE): HTMLCanvasElement {
+  let c = scratchCanvases.get(name);
+  if (!c) {
+    c = document.createElement("canvas");
+    scratchCanvases.set(name, c);
+  }
+  if (c.width !== size || c.height !== size) {
+    c.width = size;
+    c.height = size;
+  }
+  return c;
+}
+
+/** getContext가 null이면(메모리 부족) 알아볼 수 있는 오류로 */
+export function context2d(c: HTMLCanvasElement, opts?: CanvasRenderingContext2DSettings): CanvasRenderingContext2D {
+  const x = c.getContext("2d", opts);
+  if (!x) throw new Error("그림판 메모리가 부족해요. 화면을 새로고침해 주세요.");
+  return x;
+}
+
 /** 사진 + 지금까지 그린 그림을 합친 픽셀 (사진 위 채우기의 경계 찾기용) */
 function compositePixels(ctx: CanvasRenderingContext2D, under: CanvasImageSource): Uint8ClampedArray {
-  const c = document.createElement("canvas");
-  c.width = c.height = CANVAS_SIZE;
-  const x = c.getContext("2d", { willReadFrequently: true })!;
+  const c = scratchCanvas("fill-boundary");
+  const x = context2d(c, { willReadFrequently: true });
   x.fillStyle = "#fff";
   x.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   x.drawImage(under, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
@@ -264,11 +289,10 @@ export function renderAll(ctx: CanvasRenderingContext2D, ops: Stroke[], under?: 
   for (const op of ops) renderOp(ctx, op, true, under);
 }
 
-/** 사진 + 그리기 층을 합친 완성 그림 (JPEG로 내보낼 때) */
+/** 사진 + 그리기 층을 합친 완성 그림 (JPEG로 내보낼 때). 돌려준 캔버스는 다음 내보내기 때 다시 쓰입니다. */
 export function composeWithUnderlay(layer: HTMLCanvasElement, under: CanvasImageSource): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = c.height = CANVAS_SIZE;
-  const x = c.getContext("2d")!;
+  const c = scratchCanvas("compose");
+  const x = context2d(c);
   x.fillStyle = "#fff";
   x.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   x.drawImage(under, 0, 0, CANVAS_SIZE, CANVAS_SIZE);

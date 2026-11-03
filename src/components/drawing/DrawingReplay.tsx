@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { renderOp } from "@/lib/drawing/render";
+import { renderOp, scratchCanvas } from "@/lib/drawing/render";
 import { CANVAS_SIZE, isBrushOp, type Stroke } from "@/lib/heroes/rules";
 
 /** 기록 하나의 "길이" (재생 시간 배분용). 채우기·스탬프는 짧게 */
@@ -71,9 +71,9 @@ function ReplayDialog({ source, name, background, onClose }: { source: string; n
     const canvas = canvasRef.current;
     if (!ops || !canvas) return;
     const ctx = canvas.getContext("2d")!;
-    const finished = document.createElement("canvas");
-    finished.width = finished.height = CANVAS_SIZE;
+    const finished = scratchCanvas("replay");
     const fctx = finished.getContext("2d", { willReadFrequently: true })!;
+    fctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
     const total = ops.reduce((s, op) => s + unitsOf(op), 0);
     const durationMs = Math.min(12000, Math.max(3000, total * 4));
