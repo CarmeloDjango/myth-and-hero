@@ -3,7 +3,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import { composeWithUnderlay, mirrorOp, renderAll, renderOp } from "@/lib/drawing/render";
-import { BRUSH_TOOLS, CANVAS_SIZE, STAMP_SHAPES, type BrushTool, type StampShape, type Stroke } from "@/lib/heroes/rules";
+import { BRUSH_TOOLS, CANVAS_SIZE, THUMB_SIZE, STAMP_SHAPES, type BrushTool, type StampShape, type Stroke } from "@/lib/heroes/rules";
 import { BRUSHES, PEN_COLORS, PEN_SIZES, roundPoint, STAMP_SIZES, STAMPS } from "@/lib/heroes/strokes";
 
 export type DrawingCanvasHandle = {
@@ -13,6 +13,8 @@ export type DrawingCanvasHandle = {
    * - 사진이 있으면 사진 + 덧그림을 합친 JPEG
    */
   exportPng: () => Promise<Blob | null>;
+  /** 그림 + 카드 목록용 작은 그림(384px, 같은 형식)을 함께 */
+  exportImages: () => Promise<{ image: Blob; thumb: Blob | null } | null>;
 };
 
 type Props = {
@@ -130,18 +132,28 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
     paint();
   }, [ops, rebuildCommitted, paint]);
 
+  /** 내보내기: 사진이 있으면 사진 + 그림을 합친 JPEG, 없으면 투명 PNG. 작은 그림도 같은 형식 */
+  const exportImages = async () => {
+    const under = await underLoad.current;
+    const c = committedRef.current;
+    if (!c) return null;
+    // 사진을 막 불러왔으면 채우기 경계가 바뀌므로 그리기 층을 다시 그립니다.
+    if (under && under !== underImg) renderAll(c.getContext("2d", { willReadFrequently: true })!, ops, under);
+    const full = under ? composeWithUnderlay(c, under) : c;
+    const type = under ? "image/jpeg" : "image/png";
+    const small = document.createElement("canvas");
+    small.width = small.height = THUMB_SIZE;
+    const sx = small.getContext("2d")!;
+    sx.imageSmoothingQuality = "high";
+    sx.drawImage(full, 0, 0, THUMB_SIZE, THUMB_SIZE);
+    const toBlob = (cv: HTMLCanvasElement, q?: number) => new Promise<Blob | null>((r) => cv.toBlob(r, type, q));
+    const [image, thumb] = await Promise.all([toBlob(full, 0.85), toBlob(small, 0.8)]);
+    return image ? { image, thumb } : null;
+  };
+
   useImperativeHandle(ref, () => ({
-    exportPng: async () => {
-      const under = await underLoad.current;
-      const c = committedRef.current;
-      if (!c) return null;
-      // 사진을 막 불러왔으면 채우기 경계가 바뀌므로 그리기 층을 다시 그립니다.
-      if (under && under !== underImg) renderAll(c.getContext("2d", { willReadFrequently: true })!, ops, under);
-      return new Promise<Blob | null>((resolve) => {
-        if (under) composeWithUnderlay(c, under).toBlob((b) => resolve(b), "image/jpeg", 0.9);
-        else c.toBlob((b) => resolve(b), "image/png");
-      });
-    },
+    exportPng: async () => (await exportImages())?.image ?? null,
+    exportImages,
   }));
 
   const commit = (added: Stroke[]) => {

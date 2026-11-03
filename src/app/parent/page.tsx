@@ -71,7 +71,7 @@ async function ParentContent() {
     name: h.name,
     status: h.status,
     hidden: h.hidden,
-    imageSrc: heroImageSrc(h),
+    imageSrc: heroImageSrc(h, "thumb"),
     color: h.faction?.color ?? null,
     creator: h.creator?.nickname ?? null,
     seriesSlug: h.series.slug,

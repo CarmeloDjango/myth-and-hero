@@ -20,10 +20,12 @@ type FlipCardProps = {
   imageSrc?: string | null;
   /** 아이가 만든 영웅인지 ("나만의 카드" 배지) */
   isFamily?: boolean;
+  /** 사진 위에 그린 그림이면 카드 칸을 꽉 채움 */
+  imageCover?: boolean;
 };
 
 /** 누르면 뒤집히는 카드: 앞면은 일러스트, 뒷면은 능력치 */
-export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imageSrc, isFamily = false }: FlipCardProps) {
+export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imageSrc, isFamily = false, imageCover = false }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false);
 
   return (
@@ -43,7 +45,7 @@ export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imag
           <span className="relative flex flex-1 items-center justify-center" style={{ background: tint }}>
             {imageSrc ? (
               // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림 (라우트 핸들러에서 권한 확인)
-              <img src={imageSrc} alt={`${name} 그림`} className="absolute inset-0 h-full w-full object-contain" />
+              <img src={imageSrc} alt={`${name} 그림`} className={`absolute inset-0 h-full w-full ${imageCover ? "object-cover" : "object-contain"}`} />
             ) : (
               <span aria-hidden="true" className="font-display text-[220px] leading-none text-ink opacity-15">
                 {glyph}

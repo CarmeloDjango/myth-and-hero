@@ -87,7 +87,7 @@ async function HeroLists() {
           <h2 id="done" className="text-[32px] font-bold">완성한 영웅</h2>
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
             {done.map((h) => {
-              const src = heroImageSrc(h);
+              const src = heroImageSrc(h, "thumb");
               return (
                 <li key={h.id} className="flex flex-col gap-2">
                   <Link

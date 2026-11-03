@@ -145,7 +145,7 @@ export async function saveHeroName(ctx: HeroCtx, heroId: string, input: unknown,
 export async function saveHeroDrawing(
   ctx: HeroCtx,
   heroId: string,
-  input: { png: Uint8Array; strokesJson: string; background?: Uint8Array | null },
+  input: { png: Uint8Array; strokesJson: string; background?: Uint8Array | null; thumb?: Uint8Array },
   d?: Deps,
 ): Promise<Result<{ version: string }>> {
   const { db, store } = deps(d);
@@ -156,7 +156,7 @@ export async function saveHeroDrawing(
     store,
     `families/${ctx.familyId}/heroes/${hero.id}`,
     { image: hero.imageUrl, strokes: hero.strokesUrl, background: hero.backgroundUrl },
-    { image: input.png, strokesJson: input.strokesJson, background: input.background },
+    { image: input.png, strokesJson: input.strokesJson, background: input.background, thumb: input.thumb },
   );
   if (!written.ok) return fail(written.error);
   const { keys } = written;

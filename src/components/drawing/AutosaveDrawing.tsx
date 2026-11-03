@@ -3,37 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 
 import { DrawingCanvas, type DrawingCanvasHandle } from "@/components/drawing/DrawingCanvas";
-import { CANVAS_SIZE, MAX_BACKGROUND_BYTES, type Stroke } from "@/lib/heroes/rules";
+import { PhotoCropper } from "@/components/drawing/PhotoCropper";
+import type { Stroke } from "@/lib/heroes/rules";
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 
-/** 고른 사진 → 1024×1024 JPEG (가운데 맞춤, 남는 곳은 흰색). 아이폰 HEIC도 브라우저가 읽어 JPEG로 바꿉니다. */
-async function photoToBackground(file: File): Promise<Blob> {
-  const url = URL.createObjectURL(file);
-  try {
+/** 사진 파일·주소 → 다 불러온 이미지 (아이폰 HEIC도 브라우저가 읽음) */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
     const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("사진을 열 수 없어요."));
-      img.src = url;
-    });
-    const c = document.createElement("canvas");
-    c.width = c.height = CANVAS_SIZE;
-    const x = c.getContext("2d")!;
-    x.fillStyle = "#fff";
-    x.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    const k = Math.min(CANVAS_SIZE / img.naturalWidth, CANVAS_SIZE / img.naturalHeight);
-    const w = img.naturalWidth * k;
-    const h = img.naturalHeight * k;
-    x.drawImage(img, (CANVAS_SIZE - w) / 2, (CANVAS_SIZE - h) / 2, w, h);
-    for (const q of [0.88, 0.75, 0.6]) {
-      const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", q));
-      if (blob && blob.size <= MAX_BACKGROUND_BYTES) return blob;
-    }
-    throw new Error("사진이 너무 커요.");
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("사진을 열 수 없어요."));
+    img.src = src;
+  });
 }
 
 /**
@@ -41,6 +23,7 @@ async function photoToBackground(file: File): Promise<Blob> {
  * - 그리다 멈추고 1.5초 뒤 그림과 그리기 기록을 saveUrl로 올립니다 (multipart, src/lib/drawing/http.ts).
  * - hasDrawing이면 saveUrl?strokes=1에서 저장된 기록(과 밑그림 사진 주소)을 불러와 이어 그립니다.
  * - allowPhoto면 "사진 올리기"로 밑그림 사진을 깔고 그 위에 덧그릴 수 있습니다.
+ *   올린 사진은 "사진 맞추기"에서 정사각형으로 자릅니다 (자동 맞춤, 끌기, 크기).
  * - children(render prop)에 flush()를 넘겨, "다음" 버튼이 저장을 마친 뒤 넘어가게 합니다.
  */
 export function AutosaveDrawing({
@@ -70,6 +53,8 @@ export function AutosaveDrawing({
   const [underlay, setUnderlay] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>("idle");
   const [photoError, setPhotoError] = useState<string>();
+  /** 사진 맞추기 창에 띄운 사진 (새로 고른 사진이면 blob: 주소를 닫을 때 정리) */
+  const [cropping, setCropping] = useState<{ img: HTMLImageElement; temp: string | null } | null>(null);
 
   useEffect(() => {
     if (!hasDrawing) return;
@@ -98,10 +83,13 @@ export function AutosaveDrawing({
     const strokes = latest.current;
     if (!strokes) return true;
     const bg = pendingBg.current;
-    const image = await canvas.current?.exportPng();
-    if (!image) return false;
+    const out = await canvas.current?.exportImages();
+    if (!out) return false;
+    const { image, thumb } = out;
+    const ext = image.type === "image/jpeg" ? "jpg" : "png";
     const body = new FormData();
-    body.set("png", image, image.type === "image/jpeg" ? "drawing.jpg" : "drawing.png");
+    body.set("png", image, `drawing.${ext}`);
+    if (thumb) body.set("thumb", thumb, `thumb.${ext}`);
     body.set("strokes", JSON.stringify(strokes));
     if (bg === "clear") body.set("clearBackground", "1");
     else if (bg) body.set("background", bg, "background.jpg");
@@ -146,15 +134,37 @@ export function AutosaveDrawing({
   const onPickPhoto = async (file: File | undefined) => {
     if (!file) return;
     setPhotoError(undefined);
+    const temp = URL.createObjectURL(file);
     try {
-      const blob = await photoToBackground(file);
-      pendingBg.current = blob;
-      setUnderlay(URL.createObjectURL(blob));
-      latest.current = current.current;
-      schedule();
+      setCropping({ img: await loadImage(temp), temp });
+    } catch (e) {
+      URL.revokeObjectURL(temp);
+      setPhotoError(e instanceof Error ? e.message : "사진을 열 수 없어요.");
+    }
+  };
+
+  /** 지금 밑그림을 다시 맞추기 (예전에 흰 띠가 생긴 사진도 여기서 다듬을 수 있음) */
+  const recrop = async () => {
+    if (!underlay) return;
+    setPhotoError(undefined);
+    try {
+      setCropping({ img: await loadImage(underlay), temp: null });
     } catch (e) {
       setPhotoError(e instanceof Error ? e.message : "사진을 열 수 없어요.");
     }
+  };
+
+  const closeCropper = () => {
+    if (cropping?.temp) URL.revokeObjectURL(cropping.temp);
+    setCropping(null);
+  };
+
+  const applyCropped = (blob: Blob) => {
+    closeCropper();
+    pendingBg.current = blob;
+    setUnderlay(URL.createObjectURL(blob));
+    latest.current = current.current;
+    schedule();
   };
 
   const removePhoto = () => {
@@ -192,6 +202,11 @@ export function AutosaveDrawing({
             {underlay ? "사진 바꾸기" : "사진 올리기"}
           </button>
           {underlay ? (
+            <button type="button" onClick={recrop} className="sticker pressable min-h-12 rounded-button bg-paper px-4 font-bold text-blue-ink hover:bg-paper-dim">
+              사진 다시 맞추기
+            </button>
+          ) : null}
+          {underlay ? (
             <button type="button" onClick={removePhoto} className="sticker pressable min-h-12 rounded-button bg-paper px-4 font-bold text-muted hover:bg-paper-dim">
               사진 빼기
             </button>
@@ -200,6 +215,7 @@ export function AutosaveDrawing({
           )}
         </div>
       ) : null}
+      {cropping ? <PhotoCropper img={cropping.img} onCancel={closeCropper} onConfirm={applyCropped} /> : null}
       {photoError ? (
         <p role="alert" className="text-center text-sm font-bold text-[#b42318]">
           {photoError}

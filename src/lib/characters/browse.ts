@@ -87,6 +87,8 @@ export type CharacterCardData = {
   isFamily: boolean;
   /** 아이가 그린 그림 주소 (없으면 null) */
   imageSrc: string | null;
+  /** 사진 위에 그린 그림이면 카드 칸을 꽉 채움 */
+  imageCover: boolean;
 };
 
 export type CharacterPage = {

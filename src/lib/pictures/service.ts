@@ -52,7 +52,7 @@ export async function getOfficialForPicture(familyId: string, seriesSlug: string
 export async function saveCharacterPicture(
   ctx: PictureCtx,
   characterId: string,
-  input: { png: Uint8Array; strokesJson: string; background?: Uint8Array | null },
+  input: { png: Uint8Array; strokesJson: string; background?: Uint8Array | null; thumb?: Uint8Array },
   d?: Deps,
 ): Promise<Result<{ version: string }>> {
   const { db, store } = deps(d);
@@ -66,7 +66,7 @@ export async function saveCharacterPicture(
     store,
     `families/${ctx.familyId}/characters/${characterId}`,
     { image: prev?.imageUrl ?? null, strokes: prev?.strokesUrl ?? null, background: prev?.backgroundUrl ?? null },
-    { image: input.png, strokesJson: input.strokesJson, background: input.background },
+    { image: input.png, strokesJson: input.strokesJson, background: input.background, thumb: input.thumb },
   );
   if (!written.ok) return fail(written.error);
   const data = {

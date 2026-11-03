@@ -86,6 +86,8 @@ export type CharacterDetail = {
   isFamily: boolean;
   /** 카드 그림 주소: 아이가 만든 영웅의 그림, 또는 공식 인물에 우리 가족이 붙인 그림 (없으면 null) */
   imageSrc: string | null;
+  /** 사진 위에 그린 그림이면 카드 칸을 꽉 채움 */
+  imageCover: boolean;
   /** 만든 아이 별명 (나만의 카드일 때) */
   creatorNickname: string | null;
   /** 만든 아이 프로필 id (나만의 카드일 때. 그림 고치기 권한 확인용) */

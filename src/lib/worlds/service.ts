@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { STAT_KEYS } from "@/lib/characters/browse";
 import { getDb } from "@/lib/db";
+import { pictureFiles } from "@/lib/drawing/picture";
 import { validateDrawingUpload } from "@/lib/drawing/upload";
 import { strokesSchema, type Stroke } from "@/lib/heroes/rules";
 import { coverStrokesKey, getDrawingStore, worldCoverKeys, type DrawingStore } from "@/lib/storage";
@@ -153,7 +154,7 @@ export async function deleteWorld(familyId: string, seriesId: string, d?: Deps):
   if (!world) return fail("우리 가족 세계관이 아니에요.");
 
   const files = [
-    ...world.characters.flatMap((c) => [c.imageUrl, c.strokesUrl, c.backgroundUrl]),
+    ...world.characters.flatMap((c) => pictureFiles(c)),
     world.coverImage,
     world.coverImage ? coverStrokesKey(world.coverImage) : null,
   ].filter((k): k is string => !!k?.startsWith("families/"));

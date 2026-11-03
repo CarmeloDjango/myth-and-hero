@@ -93,6 +93,7 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
                 motto={c.summary}
                 imageSrc={c.imageSrc}
                 isFamily={c.isFamily}
+                imageCover={c.imageCover}
               />
             </div>
 
