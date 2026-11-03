@@ -65,3 +65,43 @@ test("다른 가족 프로필·같은 사람끼리·잘못된 값은 거절, 다
   assert.deepEqual(st.players[0].vsTori, { wins: 0, losses: 0 });
   assert.equal(st.recent.length, 0);
 });
+
+test("트로피: 새로 받은 것만 알려 주고, 난이도·마무리·내 영웅을 기록", async () => {
+  const s = Date.now();
+  const f = await db.family.create({
+    data: { ownerId: `bt-t-${s}`, parentPinHash: "t", profiles: { create: [{ nickname: "트로피", avatar: "pink", order: 0 }, { nickname: "동생", avatar: "blue", order: 1 }] } },
+    select: { id: true, profiles: { select: { id: true }, orderBy: { order: "asc" } } },
+  });
+  const [k, sib] = f.profiles.map((p) => p.id);
+  try {
+    // 첫 승: 보통 토리를 🔥로 마무리, 내 영웅을 내고, 체력 2 남기고, 10차례
+    const r1 = await recordBattle(f.id, { ...res(k, null, 1), toriLevel: "normal", finish: "fire", winnerHp: 2, p1Hero: true, turns: 10 });
+    assert.ok(r1.ok);
+    assert.deepEqual(r1.ok && r1.earned, [{ profileId: k, trophies: ["first-win", "my-hero", "fire-finish", "close", "quick", "normal-1"] }]);
+    // 같은 걸 또 해도 새 트로피 없음
+    const r2 = await recordBattle(f.id, { ...res(k, null, 1), toriLevel: "normal", finish: "fire", winnerHp: 2, p1Hero: true, turns: 10 });
+    assert.deepEqual(r2.ok && r2.earned, [{ profileId: k, trophies: [] }]);
+    // 세 번째 연승 → 3연승, 체력 16 → 끄떡없어 (난이도 없으면 쉬움으로)
+    const r3 = await recordBattle(f.id, { ...res(k, null, 1), winnerHp: 16 });
+    assert.deepEqual(r3.ok && r3.earned, [{ profileId: k, trophies: ["streak-3", "untouched"] }]);
+    // 가족 대결: 진 쪽(동생)은 새 트로피 없음, 이긴 쪽은 가족 대결 승리
+    const r4 = await recordBattle(f.id, { ...res(sib, k, 2), winnerHp: 8 });
+    assert.deepEqual(r4.ok && r4.earned, [
+      { profileId: sib, trophies: [] },
+      { profileId: k, trophies: ["family-win"] },
+    ]);
+    // 가족 대결에 토리 난이도는 거절
+    assert.equal((await recordBattle(f.id, { ...res(k, sib, 1), toriLevel: "easy" })).ok, false);
+    const st = await getBattleStats(f.id);
+    const me = st.players.find((p) => p.id === k)!;
+    assert.deepEqual(me.vsNormal, { wins: 2, losses: 0 });
+    assert.deepEqual(me.vsTori, { wins: 3, losses: 0 });
+    assert.deepEqual(me.trophies, ["first-win", "my-hero", "fire-finish", "close", "quick", "family-win", "streak-3", "normal-1", "untouched"]);
+    assert.deepEqual(st.players.find((p) => p.id === sib)!.trophies, []);
+    const rec = await db.battleRecord.findFirst({ where: { familyId: f.id, vsTori: true }, orderBy: { createdAt: "desc" } });
+    assert.equal(rec?.toriLevel, "easy");
+    assert.equal(st.recent.at(-1)?.p2, "보통 토리");
+  } finally {
+    await db.family.delete({ where: { id: f.id } });
+  }
+});

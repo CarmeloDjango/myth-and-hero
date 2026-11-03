@@ -12,7 +12,9 @@ import { applyAction, checkAction, legalActions, type Action, type BattleEvent, 
 import { isMuted, playSound, setMuted } from "@/lib/battle/sound";
 
 import { AbilityBurst, Confetti, CrisisVignette, DeathGhosts, DivineFlash, DragArrow, leaderEl, lunge, reducedMotion, unitEl, type Ghost } from "./fx";
-import { seatName, type Seat } from "./types";
+import { trophyView } from "@/lib/battle/trophies";
+
+import { seatName, type FinishFacts, type Seat, type TrophiesEarned } from "./types";
 
 const other = (s: Side) => (1 - s) as Side;
 
@@ -50,7 +52,8 @@ export function Game({
   seats: [Seat, Seat];
   onAgain: () => void;
   onMenu: () => void;
-  onFinished: (s: BattleState) => void;
+  /** 끝났을 때 한 번: 전적 저장 → 새로 받은 트로피 */
+  onFinished: (s: BattleState, facts: FinishFacts) => Promise<TrophiesEarned>;
 }) {
   const duo = seats[0].kind === "kid" && seats[1].kind === "kid";
   const [s, setS] = useState(initial);
@@ -61,6 +64,10 @@ export function Game({
   const [covered, setCovered] = useState(duo);
   const fxId = useRef(0);
   const reported = useRef(false);
+  // 트로피용: 자기가 만든 영웅 카드를 냈는지, 마지막 한 방
+  const heroPlayed = useRef<[boolean, boolean]>([false, false]);
+  const finish = useRef<FinishFacts["finish"]>("attack");
+  const [earned, setEarned] = useState<TrophiesEarned>([]);
   // "차례 끝" 확인 창 (할 수 있는 게 남았을 때)
   const [confirmEnd, setConfirmEnd] = useState<string | null>(null);
   // 이번 차례에 카드를 냈는지 (차례 번호)
@@ -125,6 +132,13 @@ export function Game({
       setDivine({ key, targets });
       setTimeout(() => setDivine((d) => (d?.key === key ? null : d)), 800);
     }
+    if (playedUnit) {
+      const seat = seats[played!.side];
+      if (seat.kind === "kid" && playedUnit.card.isFamily && playedUnit.card.creatorId === seat.profile.id) heroPlayed.current[played!.side] = true;
+    }
+    if (prev.winner === null && next.winner !== null) {
+      finish.current = playedUnit?.card.ability === "fire" ? "fire" : next.events.some((e) => e.type === "fatigue") ? "fatigue" : "attack";
+    }
     soundsFor(next, playedUnit?.card.ability ?? null);
     setS(next);
     setFx({ id: ++fxId.current, events: next.events });
@@ -173,7 +187,8 @@ export function Game({
     const justStarted = s.events.some((e) => e.type === "turn" && e.side === s.turn);
     let alive = true;
     const t = setTimeout(async () => {
-      const a = nextToriAction(s);
+      const seat = seats[s.turn];
+      const a = nextToriAction(s, seat.kind === "tori" ? seat.level : "easy");
       if (a.type === "attack") {
         playSound("attack");
         await lunge(unitEl(a.attacker), a.target === "leader" ? leaderEl(other(s.turn)) : unitEl(a.target));
@@ -200,7 +215,12 @@ export function Game({
         /* 무시 */
       }
     }
-    onFinished(s);
+    void onFinished(s, { finish: finish.current, winnerHp: s.players[s.winner].leader.hp, heroPlayed: heroPlayed.current }).then((e) => {
+      if (e.length) {
+        setEarned(e);
+        setTimeout(() => playSound("win"), 900);
+      }
+    });
   }, [s, onFinished, seats]);
 
   if (covered && s.winner === null) {
@@ -554,7 +574,7 @@ export function Game({
         </div>
       ) : null}
 
-      {s.winner !== null ? <EndDialog seats={seats} winner={s.winner} onAgain={onAgain} onMenu={onMenu} /> : null}
+      {s.winner !== null ? <EndDialog seats={seats} winner={s.winner} earned={earned} onAgain={onAgain} onMenu={onMenu} /> : null}
     </div>
   );
 }
@@ -778,20 +798,21 @@ function Board({
   );
 }
 
-function EndDialog({ seats, winner, onAgain, onMenu }: { seats: [Seat, Seat]; winner: Side; onAgain: () => void; onMenu: () => void }) {
+function EndDialog({ seats, winner, earned, onAgain, onMenu }: { seats: [Seat, Seat]; winner: Side; earned: TrophiesEarned; onAgain: () => void; onMenu: () => void }) {
   const vsTori = seats.some((x) => x.kind === "tori");
   const kidWon = seats[winner].kind === "kid";
-  const title = vsTori ? (kidWon ? "이겼어요! 🎉" : "토리가 이겼어요!") : `${seatName(seats[winner])} 승리! 🎉`;
+  const title = vsTori ? (kidWon ? "이겼어요! 🎉" : `${seatName(seats[winner])}가 이겼어요!`) : `${seatName(seats[winner])} 승리! 🎉`;
   const sub = vsTori ? (kidWon ? "토리가 깜짝 놀랐어요. 또 해 볼까요?" : "아깝다! 다시 도전해 볼까요?") : `${seatName(seats[1 - winner])}도 잘했어요! 한 판 더?`;
   const winSeat = seats[winner];
   const celebrate = winSeat.kind === "kid";
   return (
     <div role="dialog" aria-modal="true" aria-label={vsTori ? (kidWon ? "이겼어요" : "졌어요") : `${seatName(winSeat)} 승리`} className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
       {celebrate ? <Confetti /> : null}
-      <div className="flex w-full max-w-[420px] flex-col items-center gap-4 rounded-card bg-paper p-6 text-center [animation:pop_.5s_ease-out]">
+      <div className="flex max-h-[96dvh] w-full max-w-[440px] flex-col items-center gap-4 overflow-y-auto rounded-card bg-paper p-6 text-center [animation:pop_.5s_ease-out]">
         {winSeat.kind === "kid" && !vsTori ? <ProfileAvatar nickname={winSeat.profile.nickname} avatar={winSeat.profile.avatar} size={120} /> : <Tori size={120} mood="wow" />}
         <p className="font-display text-5xl text-green-dark">{title}</p>
         <p className="text-lg font-medium text-muted">{sub}</p>
+        {earned.length ? <NewTrophies seats={seats} earned={earned} /> : null}
         <div className="flex flex-wrap justify-center gap-2">
           <button type="button" onClick={onAgain} className="pressable min-h-14 rounded-button border-b-4 border-green-dark bg-green px-6 text-lg font-bold text-paper">
             같은 덱으로 다시
@@ -801,6 +822,41 @@ function EndDialog({ seats, winner, onAgain, onMenu }: { seats: [Seat, Seat]; wi
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 이번 판에 새로 받은 트로피 */
+function NewTrophies({ seats, earned }: { seats: [Seat, Seat]; earned: TrophiesEarned }) {
+  const duo = seats.every((x) => x.kind === "kid");
+  return (
+    <div role="status" className="flex w-full flex-col gap-2 rounded-card bg-[#fff4c2] p-3 [animation:pop_.5s_ease-out_.6s_both]">
+      <p className="font-display text-2xl text-[#a06800]">새 트로피! 🏆</p>
+      {earned.map(({ profileId, trophies }) => {
+        const seat = seats.find((x) => x.kind === "kid" && x.profile.id === profileId);
+        return (
+          <ul key={profileId} className="flex flex-col gap-1.5 text-left" aria-label={seat ? `${seatName(seat)} 새 트로피` : "새 트로피"}>
+            {trophies.map((id) => {
+              const t = trophyView(id);
+              if (!t) return null;
+              return (
+                <li key={id} className="flex items-center gap-3 rounded-button bg-paper px-3 py-2">
+                  <span aria-hidden="true" className="text-3xl">
+                    {t.icon}
+                  </span>
+                  <span className="flex flex-col">
+                    <b className="text-lg leading-tight">
+                      {duo && seat ? `${seatName(seat)}: ` : ""}
+                      {t.name}
+                    </b>
+                    <span className="text-[14px] font-medium text-muted">{t.hint}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        );
+      })}
     </div>
   );
 }
