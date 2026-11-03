@@ -308,10 +308,16 @@ function PlayerBar({
         ))}
       </div>
       {hidden ? (
-        <div className="ml-auto flex gap-1" aria-label={`${seatName(seat)} 손패 ${player.hand.length}장`}>
-          {player.hand.map((_, i) => (
-            <CardBack key={i} />
-          ))}
+        <div className="ml-auto flex flex-col items-end gap-1" aria-label={`${seatName(seat)} 손패 ${player.hand.length}장`}>
+          <div className="flex gap-1">
+            {player.hand.map((_, i) => (
+              <CardBack key={i} />
+            ))}
+          </div>
+          {/* 뒤집힌 카드가 무엇인지 글로도 알려 줌 (상대가 손에 든 카드, 앞면은 안 보임) */}
+          <span aria-hidden="true" className="text-[13px] font-bold text-muted">
+            손에 든 카드 {player.hand.length}장
+          </span>
         </div>
       ) : (
         <div className="ml-auto">{children}</div>
