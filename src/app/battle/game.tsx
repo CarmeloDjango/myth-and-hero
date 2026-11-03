@@ -287,7 +287,8 @@ function PlayerBar({
           {seat.kind === "kid" ? <ProfileAvatar nickname={seat.profile.nickname} avatar={seat.profile.avatar} size={24} /> : null}
           {seat.kind === "tori" ? "토리" : `${seat.profile.nickname} · 대장 ${l.name}`}
         </span>
-        <span className="flex items-center gap-1 font-black" aria-label={`체력 ${l.hp}`}>
+        <span className="flex items-center gap-1 font-black" aria-label={`대장 체력 ${l.hp}`}>
+          <span aria-hidden="true" className="text-sm font-bold text-muted">대장 체력</span>
           <span aria-hidden="true">❤️</span>
           <span className={l.hp <= 5 ? "text-[#b42318]" : ""}>{Math.max(0, l.hp)}</span>
           <span className="text-sm font-bold text-muted">/ {l.maxHp}</span>
