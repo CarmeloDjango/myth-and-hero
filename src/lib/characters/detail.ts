@@ -88,6 +88,8 @@ export type CharacterDetail = {
   imageSrc: string | null;
   /** 만든 아이 별명 (나만의 카드일 때) */
   creatorNickname: string | null;
+  /** 그린 과정 다시 보기용 영웅 id (그림이 있는 나만의 카드일 때만) */
+  replayId: string | null;
   series: { slug: string; name: string; statLabels: StatLabels };
   related: RelatedCharacter[];
   prev: { slug: string; name: string } | null;

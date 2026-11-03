@@ -179,6 +179,9 @@ describe("영웅 만들기", () => {
   test("그림 읽기 권한: 형제는 완성작 OK, 다른 가족은 불가", async () => {
     assert.ok(await heroes.getHeroImageKey(famA.id, famA.kid2, heroId));
     assert.equal(await heroes.getHeroImageKey(famB.id, famB.kid, heroId), null);
+    // 그린 과정 다시 보기: 완성작은 형제도, 다른 가족은 불가
+    assert.equal((await heroes.getHeroStrokes(kid2(), heroId))?.length, 1);
+    assert.equal(await heroes.getHeroStrokes(other(), heroId), null);
   });
 
   test("완성한 영웅은 아이가 못 지우고, 부모 모드에서 숨기기·지우기", async () => {

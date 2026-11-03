@@ -9,6 +9,8 @@ import { STAT_COLOR, STAT_ORDER, type CharacterDetail } from "@/lib/characters/d
 import { getViewer, requireProfile } from "@/lib/family/viewer";
 import { getCharacterDetail } from "@/lib/queries/characters";
 
+import { DrawingReplay } from "@/components/drawing/DrawingReplay";
+
 import { CollectButton, FlipCard, ReadAloudButton } from "./detail-client";
 
 /** 진영 배경색 → 같은 계열의 진한 글자색 (docs/DESIGN.md 2장) */
@@ -115,6 +117,7 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
               <div className="flex flex-wrap gap-3 pt-2">
                 <ReadAloudButton text={readText} />
                 <CollectButton cardId={`${c.series.slug}/${c.slug}`} name={c.name} />
+                {c.replayId ? <DrawingReplay heroId={c.replayId} name={c.name} background={tint} /> : null}
               </div>
             </div>
           </div>

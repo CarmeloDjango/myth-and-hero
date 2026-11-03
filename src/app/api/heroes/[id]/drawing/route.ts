@@ -7,7 +7,7 @@ import { getDrawingStore } from "@/lib/storage";
 
 /**
  * GET  /api/heroes/:id/drawing          → 그림 PNG (같은 가족만, 초안은 만든 아이만)
- * GET  /api/heroes/:id/drawing?strokes=1 → 이어 그리기용 획 JSON (만든 아이만)
+ * GET  /api/heroes/:id/drawing?strokes=1 → 그리기 기록 JSON (초안은 만든 아이만, 완성작은 같은 가족)
  * POST /api/heroes/:id/drawing          → 그림 저장 (multipart: png, strokes) (만든 아이만)
  *
  * 저장소(비공개 버킷)는 이 핸들러만 읽고 씁니다. 브라우저는 저장소에 직접 접근하지 않습니다.
@@ -19,8 +19,7 @@ export async function GET(request: Request, { params }: RouteContext<"/api/heroe
   if (!viewer) return new Response("Unauthorized", { status: 401 });
 
   if (new URL(request.url).searchParams.get("strokes")) {
-    if (!viewer.profile) return new Response("Forbidden", { status: 403 });
-    const strokes = await getHeroStrokes({ familyId: viewer.family.id, profileId: viewer.profile.id }, id);
+    const strokes = await getHeroStrokes({ familyId: viewer.family.id, profileId: viewer.profile?.id ?? null }, id);
     return Response.json({ strokes: strokes ?? [] }, { headers: { "Cache-Control": "private, no-store" } });
   }
 

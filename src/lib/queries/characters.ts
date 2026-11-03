@@ -252,6 +252,7 @@ export async function getCharacterDetail(
     isFamily: c.familyId !== null,
     imageSrc: heroImageSrc(c),
     creatorNickname: c.creator?.nickname ?? null,
+    replayId: c.familyId && c.imageUrl ? c.id : null,
     series: { slug: c.series.slug, name: c.series.name, statLabels: toStatLabels(c.series.statLabels) },
     related,
     prev,

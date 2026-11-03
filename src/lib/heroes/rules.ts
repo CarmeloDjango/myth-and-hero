@@ -92,17 +92,55 @@ export const heroNameSchema = z.object({
   title: z.string().trim().max(HERO_TITLE_MAX, `칭호는 ${HERO_TITLE_MAX}글자까지예요.`).default(""),
 });
 
-/** 그리기 획 (저장 형식). 점은 [x, y, 필압], 좌표는 0~1024 캔버스 기준 */
+/**
+ * 그리기 기록 (저장 형식). 그린 순서대로 다시 그리면 같은 그림이 나옵니다(되돌리기·다시 보기에 씀).
+ * 좌표는 0~1024 캔버스 기준, 점은 [x, y, 필압].
+ *
+ * - 붓 획: 펜, 크레용, 마커, 형광펜, 반짝이, 무지개, 지우개
+ * - 채우기: 그 지점과 이어진 같은 색 영역을 칠함
+ * - 스탬프: 모양을 찍음
+ *
+ * 예전에 저장한 그림(펜·지우개만 있던 때)도 그대로 읽힙니다.
+ */
 export const CANVAS_SIZE = 1024;
-export const strokeSchema = z.object({
-  tool: z.enum(["pen", "eraser"]),
-  color: z.string().regex(/^#[0-9a-f]{6}$/i),
-  size: z.number().min(1).max(80),
+
+export const BRUSH_TOOLS = ["pen", "crayon", "marker", "highlighter", "glitter", "rainbow", "eraser"] as const;
+export type BrushTool = (typeof BRUSH_TOOLS)[number];
+
+export const STAMP_SHAPES = ["star", "heart", "bolt", "crown", "sword", "shield", "flame", "flower", "moon", "gem"] as const;
+export type StampShape = (typeof STAMP_SHAPES)[number];
+
+const hex = z.string().regex(/^#[0-9a-f]{6}$/i);
+const coord = z.number().finite().min(-256).max(CANVAS_SIZE + 256);
+
+const brushOpSchema = z.object({
+  tool: z.enum(BRUSH_TOOLS),
+  color: hex,
+  size: z.number().min(1).max(160),
   simulatePressure: z.boolean(),
-  points: z.array(z.tuple([z.number(), z.number(), z.number()])).min(1).max(5000),
+  points: z.array(z.tuple([coord, coord, z.number().min(0).max(1)])).min(1).max(5000),
 });
+const fillOpSchema = z.object({ tool: z.literal("fill"), color: hex, x: coord, y: coord });
+const stampOpSchema = z.object({
+  tool: z.literal("stamp"),
+  shape: z.enum(STAMP_SHAPES),
+  color: hex,
+  x: coord,
+  y: coord,
+  size: z.number().min(16).max(800),
+  rotation: z.number().min(-360).max(360),
+});
+
+export const strokeSchema = z.union([brushOpSchema, fillOpSchema, stampOpSchema]);
+export type BrushOp = z.infer<typeof brushOpSchema>;
+export type FillOp = z.infer<typeof fillOpSchema>;
+export type StampOp = z.infer<typeof stampOpSchema>;
 export type Stroke = z.infer<typeof strokeSchema>;
 export const strokesSchema = z.array(strokeSchema).max(3000);
+
+export function isBrushOp(s: Stroke): s is BrushOp {
+  return (BRUSH_TOOLS as readonly string[]).includes(s.tool);
+}
 
 /** 업로드 제한 (Vercel 요청 본문 4.5MB 이내) */
 export const MAX_PNG_BYTES = 2 * 1024 * 1024;

@@ -182,11 +182,23 @@ export async function saveHeroDrawing(
   return { ok: true, version };
 }
 
-/** 이어 그리기용: 저장된 획 데이터 */
-export async function getHeroStrokes(ctx: HeroCtx, heroId: string, d?: Deps): Promise<Stroke[] | null> {
+/**
+ * 저장된 그리기 기록 (이어 그리기, 그린 과정 다시 보기)
+ * - 만드는 중(초안): 만든 아이만
+ * - 완성: 같은 가족 누구나 (형제도 "그린 과정 보기" 가능)
+ */
+export async function getHeroStrokes(
+  ctx: { familyId: string; profileId: string | null },
+  heroId: string,
+  d?: Deps,
+): Promise<Stroke[] | null> {
   const { db, store } = deps(d);
-  const hero = await findOwnHero(db, ctx, heroId);
+  const hero = await db.character.findFirst({
+    where: { id: heroId, familyId: ctx.familyId },
+    select: { strokesUrl: true, status: true, creatorId: true },
+  });
   if (!hero?.strokesUrl) return null;
+  if (hero.status === "DRAFT" && hero.creatorId !== ctx.profileId) return null;
   const obj = await store.get(hero.strokesUrl);
   if (!obj) return null;
   const parsed = strokesSchema.safeParse(JSON.parse(new TextDecoder().decode(obj.body)));
