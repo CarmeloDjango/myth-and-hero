@@ -63,7 +63,7 @@ class S3DrawingStore implements DrawingStore {
 
 /** 로컬 개발용 파일 저장소 */
 class FileDrawingStore implements DrawingStore {
-  private root = path.resolve(process.env.DRAWING_STORE_DIR ?? ".data/drawings");
+  private root = path.resolve(/*turbopackIgnore: true*/ process.env.DRAWING_STORE_DIR ?? ".data/drawings");
 
   private resolve(key: string) {
     const full = path.resolve(this.root, key);
@@ -109,4 +109,14 @@ export function setDrawingStore(next: DrawingStore | undefined) {
 export function drawingKeys(familyId: string, heroId: string, version: string) {
   const base = `families/${familyId}/heroes/${heroId}/${version}`;
   return { png: `${base}/drawing.png`, strokes: `${base}/strokes.json` };
+}
+
+/** 세계관 표지 키: 그림 PNG와 획 JSON을 같은 버전 폴더에 둡니다 (획 키는 그림 키에서 알 수 있음). */
+export function worldCoverKeys(familyId: string, seriesId: string, version: string) {
+  const base = `families/${familyId}/worlds/${seriesId}/${version}`;
+  return { png: `${base}/cover.png`, strokes: `${base}/strokes.json` };
+}
+
+export function coverStrokesKey(pngKey: string): string {
+  return pngKey.replace(/cover\.png$/, "strokes.json");
 }

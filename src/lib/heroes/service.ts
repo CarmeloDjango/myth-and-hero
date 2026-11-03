@@ -5,12 +5,11 @@ import { randomBytes } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { STAT_KEYS, toStatLabels } from "@/lib/characters/browse";
 import { getDb } from "@/lib/db";
+import { validateDrawingUpload } from "@/lib/drawing/upload";
 import {
   composeStory,
   heroNameSchema,
   heroStatsSchema,
-  MAX_PNG_BYTES,
-  MAX_STROKES_BYTES,
   stepIndex,
   storyAnswersSchema,
   strokesSchema,
@@ -151,20 +150,9 @@ export async function saveHeroDrawing(
   const hero = await findOwnHero(db, ctx, heroId);
   if (!hero) return fail("내가 만든 영웅이 아니에요.");
 
-  if (input.png.byteLength === 0 || input.png.byteLength > MAX_PNG_BYTES) return fail("그림 파일이 너무 커요.");
-  // PNG 시그니처 확인 (89 50 4E 47)
-  const sig = input.png.subarray(0, 4);
-  if (sig[0] !== 0x89 || sig[1] !== 0x50 || sig[2] !== 0x4e || sig[3] !== 0x47) return fail("그림 파일 형식이 달라요.");
-  if (input.strokesJson.length > MAX_STROKES_BYTES) return fail("그림 데이터가 너무 커요.");
-
-  let strokes: Stroke[];
-  try {
-    const parsed = strokesSchema.safeParse(JSON.parse(input.strokesJson));
-    if (!parsed.success) return fail("그림 데이터를 읽을 수 없어요.");
-    strokes = parsed.data;
-  } catch {
-    return fail("그림 데이터를 읽을 수 없어요.");
-  }
+  const checked = validateDrawingUpload(input.png, input.strokesJson);
+  if (!checked.ok) return fail(checked.error);
+  const strokes = checked.strokes;
 
   const version = `${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
   const keys = drawingKeys(ctx.familyId, hero.id, version);

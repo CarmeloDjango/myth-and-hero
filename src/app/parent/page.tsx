@@ -8,8 +8,11 @@ import { CenteredPanel, SecondaryButton } from "@/components/ui/form";
 import { AVATAR_KEYS, MAX_PROFILES, type AvatarKey } from "@/lib/family/avatars";
 import { requireFamily } from "@/lib/family/viewer";
 import { heroImageSrc, listFamilyHeroes } from "@/lib/heroes/service";
+import { worldColor } from "@/lib/worlds/rules";
+import { listFamilyWorlds, worldCoverSrc } from "@/lib/worlds/service";
 
 import { ParentHeroList } from "./hero-controls";
+import { ParentWorldList } from "./world-controls";
 import { AddProfileForm, ParentPinForm, ProfileEditor, SignOutButton } from "./parent-client";
 
 export const metadata: Metadata = { title: "부모 모드 · 영웅 도감" };
@@ -45,7 +48,18 @@ async function ParentContent() {
   }
 
   const profiles = viewer.family.profiles;
-  const heroes = (await listFamilyHeroes(viewer.family.id)).map((h) => ({
+  const [heroRows, worldRows] = await Promise.all([listFamilyHeroes(viewer.family.id), listFamilyWorlds(viewer.family.id)]);
+  const worlds = worldRows.map((w) => ({
+    id: w.id,
+    slug: w.slug,
+    name: w.name,
+    description: w.description,
+    coverSrc: worldCoverSrc(w),
+    tint: worldColor(w.themeColor)?.soft ?? "#f7f7f7",
+    creator: w.creator?.nickname ?? null,
+    heroes: w._count.characters,
+  }));
+  const heroes = heroRows.map((h) => ({
     id: h.id,
     slug: h.slug,
     name: h.name,
@@ -83,6 +97,14 @@ async function ParentContent() {
             ))}
             {profiles.length < MAX_PROFILES ? <AddProfileForm /> : null}
           </div>
+        </section>
+
+        <section aria-labelledby="worlds" className="flex flex-col gap-4">
+          <h2 id="worlds" className="text-[32px] font-bold">
+            아이들이 만든 세계관 ({worlds.length})
+          </h2>
+          <p className="font-medium text-muted">세계관을 지우면 그 안의 영웅과 그림도 함께 지워져요.</p>
+          <ParentWorldList worlds={worlds} />
         </section>
 
         <section aria-labelledby="heroes" className="flex flex-col gap-4">

@@ -137,10 +137,10 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
               {hasBatchim(labels[topStat]) ? "이" : "가"} 제일 높아요!
             </p>
           </div>
-          <dl className="flex min-w-0 flex-[2_1_560px] flex-col gap-5">
+          <dl className="grid min-w-0 flex-[2_1_560px] grid-cols-[minmax(4rem,auto)_1fr] items-center gap-x-4 gap-y-5">
             {STAT_ORDER.map((k) => (
-              <div key={k} className="flex items-center gap-4">
-                <dt className="w-16 shrink-0 text-[19px] font-bold">{labels[k]}</dt>
+              <div key={k} className="contents">
+                <dt className="whitespace-nowrap text-[19px] font-bold">{labels[k]}</dt>
                 <dd className="flex flex-1 items-center gap-4">
                   <span className="h-6 flex-1 overflow-hidden rounded-xl bg-line">
                     <span className="relative block h-full rounded-xl" style={{ width: `${c.stats[k]}%`, background: STAT_COLOR[k] }}>

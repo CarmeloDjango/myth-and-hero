@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -12,8 +12,8 @@ import {
   saveHeroStoryAction,
   skipHeroDrawingAction,
 } from "@/app/actions/heroes";
-import { DrawingCanvas, type DrawingCanvasHandle } from "@/components/drawing/DrawingCanvas";
-import { FormError, PrimaryButton, SecondaryButton, TextField } from "@/components/ui/form";
+import { AutosaveDrawing } from "@/components/drawing/AutosaveDrawing";
+import { FormError, PrimaryButton, TextField } from "@/components/ui/form";
 import { STAT_KEYS, type StatKey, type StatLabels } from "@/lib/characters/browse";
 import {
   HERO_NAME_MAX,
@@ -25,7 +25,6 @@ import {
   STORY_PROMPTS,
   stepIndex,
   TITLE_SUGGESTIONS,
-  type Stroke,
   type StoryAnswers,
 } from "@/lib/heroes/rules";
 
@@ -96,104 +95,35 @@ export function NameStep({ heroId, name, title }: { heroId: string; name: string
 }
 
 /* ② 그리기 (자동 저장) */
-type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
-
 export function DrawStep({ heroId, background, hasDrawing }: { heroId: string; background: string; hasDrawing: boolean }) {
   const router = useRouter();
-  const canvas = useRef<DrawingCanvasHandle>(null);
-  const latest = useRef<Stroke[] | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inflight = useRef<Promise<boolean> | null>(null);
-  const [initial, setInitial] = useState<Stroke[] | null>(hasDrawing ? null : []);
-  const [save, setSave] = useState<SaveState>("idle");
   const [leaving, setLeaving] = useState(false);
-
-  // 이어 그리기: 저장된 획 불러오기
-  useEffect(() => {
-    if (!hasDrawing) return;
-    let alive = true;
-    fetch(`/api/heroes/${heroId}/drawing?strokes=1`)
-      .then((r) => (r.ok ? r.json() : { strokes: [] }))
-      .then((d: { strokes: Stroke[] }) => alive && setInitial(d.strokes))
-      .catch(() => alive && setInitial([]));
-    return () => {
-      alive = false;
-    };
-  }, [heroId, hasDrawing]);
-
-  const upload = async (): Promise<boolean> => {
-    const strokes = latest.current;
-    if (!strokes) return true;
-    const png = await canvas.current?.exportPng();
-    if (!png) return false;
-    const body = new FormData();
-    body.set("png", png, "drawing.png");
-    body.set("strokes", JSON.stringify(strokes));
-    setSave("saving");
-    try {
-      const res = await fetch(`/api/heroes/${heroId}/drawing`, { method: "POST", body });
-      const data = (await res.json()) as { ok: boolean };
-      if (!data.ok) throw new Error();
-      if (latest.current === strokes) latest.current = null;
-      setSave(latest.current ? "dirty" : "saved");
-      return true;
-    } catch {
-      setSave("error");
-      return false;
-    }
-  };
-
-  const flush = async () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    if (inflight.current) await inflight.current;
-    if (!latest.current) return true;
-    inflight.current = upload();
-    const ok = await inflight.current;
-    inflight.current = null;
-    return ok;
-  };
-
-  const onChange = (strokes: Stroke[]) => {
-    latest.current = strokes;
-    setSave("dirty");
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => void flush(), 1500);
-  };
-
-  const next = async () => {
-    setLeaving(true);
-    const ok = await flush();
-    if (!ok) {
-      setLeaving(false);
-      return;
-    }
-    if (!hasDrawing && save === "idle") {
-      // 아무것도 안 그렸으면 그림 없이 다음 단계로
-      await skipHeroDrawingAction(heroId);
-      return;
-    }
-    router.push(`/me/heroes/${heroId}/make?step=${stepIndex("kind")}`);
-  };
-
   return (
-    <div className="flex flex-col gap-4">
-      {initial ? (
-        <DrawingCanvas ref={canvas} initialStrokes={initial} background={background} onChange={onChange} />
-      ) : (
-        <div role="status" className="mx-auto flex aspect-square w-full max-w-[640px] items-center justify-center rounded-card bg-paper-dim font-bold text-muted">
-          그림 불러오는 중…
-        </div>
+    <AutosaveDrawing saveUrl={`/api/heroes/${heroId}/drawing`} background={background} hasDrawing={hasDrawing}>
+      {({ flush, touched, ready }) => (
+        <StepNav heroId={heroId} step={stepIndex("draw")}>
+          <PrimaryButton
+            type="button"
+            disabled={leaving || !ready}
+            onClick={async () => {
+              setLeaving(true);
+              if (!(await flush())) {
+                setLeaving(false);
+                return;
+              }
+              // 아무것도 안 그렸으면 그림 없이 다음 단계로
+              if (!hasDrawing && !touched) {
+                await skipHeroDrawingAction(heroId);
+                return;
+              }
+              router.push(`/me/heroes/${heroId}/make?step=${stepIndex("kind")}`);
+            }}
+          >
+            {leaving ? "저장 중…" : "다음 →"}
+          </PrimaryButton>
+        </StepNav>
       )}
-      <p role="status" aria-live="polite" className="text-center text-sm font-bold text-muted">
-        {save === "saving" ? "저장하는 중…" : save === "saved" ? "저장했어요 ✓" : save === "error" ? "저장하지 못했어요. 다시 해 볼게요." : save === "dirty" ? "곧 저장해요" : " "}
-      </p>
-      <StepNav heroId={heroId} step={stepIndex("draw")}>
-        <PrimaryButton type="button" onClick={next} disabled={leaving || initial === null}>
-          {leaving ? "저장 중…" : "다음 →"}
-        </PrimaryButton>
-      </StepNav>
-    </div>
+    </AutosaveDrawing>
   );
 }
 
@@ -404,4 +334,3 @@ export function FinishStep({ heroId, children }: { heroId: string; children: Rea
   );
 }
 
-export { SecondaryButton };

@@ -115,6 +115,10 @@ export async function getSeriesForBrowse(familyId: string | null, slug: string) 
   const series = await getDb().series.findFirst({
     where: { slug, ...visibleSeriesWhere(familyId) },
     select: {
+      id: true,
+      familyId: true,
+      themeColor: true,
+      coverImage: true,
       slug: true,
       name: true,
       description: true,
@@ -126,6 +130,10 @@ export async function getSeriesForBrowse(familyId: string | null, slug: string) 
   if (!series) return null;
 
   return {
+    id: series.id,
+    familyId: series.familyId,
+    themeColor: series.themeColor,
+    coverImage: series.coverImage,
     slug: series.slug,
     name: series.name,
     description: series.description,
@@ -141,11 +149,14 @@ export async function getSeriesList(familyId: string | null) {
     where: visibleSeriesWhere(familyId),
     orderBy: [{ order: "asc" }, { name: "asc" }],
     select: {
+      id: true,
       slug: true,
       name: true,
       description: true,
       themeColor: true,
+      coverImage: true,
       familyId: true,
+      creator: { select: { nickname: true } },
       _count: { select: { characters: { where: visibleCharacterWhere(familyId) } } },
     },
   });

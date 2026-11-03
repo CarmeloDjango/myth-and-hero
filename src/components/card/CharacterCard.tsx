@@ -56,10 +56,10 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
         {c.title ? <p className="text-[15px] font-medium text-muted">{c.title}</p> : null}
       </div>
 
-      <dl className="flex flex-col gap-2.5 px-[18px] pb-[18px] pt-3">
+      <dl className="grid grid-cols-[minmax(34px,auto)_1fr] items-center gap-x-2.5 gap-y-2.5 px-[18px] pb-[18px] pt-3">
         {stats.map((s) => (
-          <div key={s.label} className="flex items-center gap-2.5">
-            <dt className="w-[34px] shrink-0 text-[13px] font-bold text-muted">{s.label}</dt>
+          <div key={s.label} className="contents">
+            <dt className="whitespace-nowrap text-[13px] font-bold text-muted">{s.label}</dt>
             <dd className="flex flex-1 items-center gap-2.5">
               <span className="h-4 flex-1 overflow-hidden rounded-lg bg-line">
                 <span className="relative block h-full rounded-lg" style={{ width: `${s.value}%`, background: s.color }}>

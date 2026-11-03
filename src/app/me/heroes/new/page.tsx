@@ -5,7 +5,11 @@ import { createHeroDraftAction } from "@/app/actions/heroes";
 import { SiteFooter, SiteHeader } from "@/components/layout/SiteChrome";
 import { Tori } from "@/components/mascot/Tori";
 import { requireProfile } from "@/lib/family/viewer";
+import Link from "next/link";
+
+import { WorldCover } from "@/components/world/WorldCover";
 import { getSeriesList } from "@/lib/queries/characters";
+import { worldCoverSrc } from "@/lib/worlds/service";
 
 export const metadata: Metadata = { title: "영웅 만들기 · 영웅 도감" };
 
@@ -41,14 +45,27 @@ async function WorldChooser() {
           <form action={createHeroDraftAction.bind(null, w.slug)}>
             <button
               type="submit"
-              className="sticker pressable flex w-full flex-col gap-2 rounded-card bg-paper p-6 text-left transition-transform hover:-translate-y-1"
+              className="sticker pressable flex w-full flex-col overflow-hidden rounded-card bg-paper text-left transition-transform hover:-translate-y-1"
             >
-              <span className="font-display text-4xl">{w.name}</span>
-              <span className="font-medium text-muted">{w.description}</span>
+              <WorldCover name={w.name} themeColor={w.themeColor} coverSrc={worldCoverSrc(w)} className="h-28 text-5xl" />
+              <span className="flex flex-col gap-2 p-5">
+                <span className="font-display text-4xl">{w.name}</span>
+                <span className="font-medium text-muted">{w.description}</span>
+              </span>
             </button>
           </form>
         </li>
       ))}
+      <li>
+        <Link
+          href="/me/worlds/new"
+          className="pressable flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-card border-2 border-b-4 border-dashed border-line bg-paper p-6 text-center hover:bg-paper-dim"
+        >
+          <span aria-hidden="true" className="font-display text-5xl text-blue-ink">+</span>
+          <span className="font-display text-3xl">새 세계관 만들기</span>
+          <span className="font-medium text-muted">원하는 세계가 없으면 만들어요</span>
+        </Link>
+      </li>
     </ul>
   );
 }

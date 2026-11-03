@@ -74,7 +74,7 @@ export function FlipCard({ name, glyph, rarity, tint, stats, labels, motto, imag
           <span className="font-display text-[40px] leading-tight text-blue-ink">{name}의 비밀 카드</span>
           {STAT_ORDER.map((k) => (
             <span key={k} className="flex items-center gap-2.5">
-              <span className="w-12 shrink-0 text-[15px] font-bold">{labels[k]}</span>
+              <span className="min-w-12 shrink-0 whitespace-nowrap text-[15px] font-bold">{labels[k]}</span>
               <span className="h-4 flex-1 overflow-hidden rounded-lg bg-paper">
                 <span className="block h-full rounded-lg" style={{ width: `${stats[k]}%`, background: STAT_COLOR[k] }} />
               </span>
