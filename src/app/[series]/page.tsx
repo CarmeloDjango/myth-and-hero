@@ -16,7 +16,10 @@ import {
   type CharacterPage,
 } from "@/lib/characters/browse";
 import { getViewer, requireProfile } from "@/lib/family/viewer";
+import { createHeroDraftAction } from "@/app/actions/heroes";
+import { WorldCover } from "@/components/world/WorldCover";
 import { getCharacterPage, getSeriesForBrowse } from "@/lib/queries/characters";
+import { worldCoverSrc } from "@/lib/worlds/service";
 
 import { CharacterBrowser } from "./character-browser";
 
@@ -71,11 +74,23 @@ async function SeriesBrowse({
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <h1 className="font-display text-[64px] leading-[1.2] tracking-[-0.02em] text-green-dark">
-          {series.name} 도감
-        </h1>
-        <p className="text-[19px] font-medium text-muted">{series.description}</p>
+      {series.familyId ? (
+        <div className="sticker overflow-hidden rounded-card">
+          <WorldCover name={series.name} themeColor={series.themeColor} coverSrc={worldCoverSrc(series)} className="h-56 text-8xl" />
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="font-display text-[64px] leading-[1.2] tracking-[-0.02em] text-green-dark">
+            {series.name} 도감
+          </h1>
+          <p className="text-[19px] font-medium text-muted">{series.description}</p>
+        </div>
+        <form action={createHeroDraftAction.bind(null, series.slug)}>
+          <button type="submit" className="pressable inline-flex min-h-14 items-center rounded-button border-b-4 border-green-dark bg-green px-6 font-bold tracking-[0.053em] text-paper">
+            이 세계에 영웅 만들기 +
+          </button>
+        </form>
       </div>
       <HydrationBoundary state={dehydrate(queryClient)}>
         <CharacterBrowser

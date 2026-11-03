@@ -111,6 +111,11 @@ export function CharacterBrowser({ seriesSlug, statLabels, factions, kinds }: Pr
             다시 해 보기
           </button>
         </div>
+      ) : items.length === 0 && !query.isFetching && !filters.q && !filters.faction && !filters.kind ? (
+        <div className="sticker flex flex-col items-center gap-3 rounded-card px-6 py-12 text-center">
+          <p className="font-display text-5xl text-green-dark">아직 영웅이 없어요!</p>
+          <p className="text-lg font-medium text-muted">위의 &ldquo;이 세계에 영웅 만들기&rdquo;를 눌러 첫 영웅을 만들어 볼까요?</p>
+        </div>
       ) : items.length === 0 && !query.isFetching ? (
         <div className="sticker flex flex-col items-center gap-3 rounded-card px-6 py-12 text-center">
           <p className="font-display text-5xl text-green-dark">앗, 못 찾았어요!</p>

@@ -4,14 +4,9 @@ import { connection } from "next/server";
 
 import { SiteFooter, SiteHeader } from "@/components/layout/SiteChrome";
 import { requireProfile } from "@/lib/family/viewer";
+import { WorldCover } from "@/components/world/WorldCover";
 import { getSeriesList } from "@/lib/queries/characters";
-
-/** 세계관 카드 위쪽 그림 영역 색 (테마 색이 없을 때) */
-const FALLBACK_TINT = "#f7f7f7";
-const SERIES_TINT: Record<string, string> = {
-  "#58cc02": "#d7ffb8",
-  "#ce82ff": "#f3e1ff",
-};
+import { worldCoverSrc } from "@/lib/worlds/service";
 
 async function SeriesGrid() {
   await connection();
@@ -52,13 +47,7 @@ async function SeriesGrid() {
           href={`/${s.slug}`}
           className="sticker pressable flex flex-col overflow-hidden rounded-card bg-paper transition-transform hover:-translate-y-1"
         >
-          <span
-            aria-hidden="true"
-            className="flex h-40 items-center justify-center font-display text-7xl text-ink/20"
-            style={{ background: (s.themeColor && SERIES_TINT[s.themeColor]) || FALLBACK_TINT }}
-          >
-            {s.name.slice(0, 2)}
-          </span>
+          <WorldCover name={s.name} themeColor={s.themeColor} coverSrc={worldCoverSrc(s)} />
           <span className="flex flex-col gap-1.5 p-5">
             <span className="flex items-center justify-between gap-2">
               <span className="font-display text-[32px] leading-tight">{s.name}</span>
@@ -67,9 +56,22 @@ async function SeriesGrid() {
               </span>
             </span>
             <span className="text-base font-medium leading-normal text-muted">{s.description}</span>
+            {s.familyId ? (
+              <span className="self-start rounded-button bg-pink-soft px-2.5 py-1 text-[13px] font-bold text-pink-ink">
+                우리 가족{s.creator ? ` · ${s.creator.nickname}` : ""}
+              </span>
+            ) : null}
           </span>
         </Link>
       ))}
+      <Link
+        href="/me/worlds/new"
+        className="pressable flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-card border-2 border-b-4 border-dashed border-line bg-paper p-6 text-center transition-transform hover:-translate-y-1 hover:bg-paper-dim"
+      >
+        <span aria-hidden="true" className="flex size-16 items-center justify-center rounded-full bg-blue-soft font-display text-5xl text-blue-ink">+</span>
+        <span className="font-display text-[28px] leading-tight">새 세계관 만들기</span>
+        <span className="font-medium text-muted">좋아하는 이야기로 우리만의 세계를 만들어요</span>
+      </Link>
     </div>
     </div>
   );
