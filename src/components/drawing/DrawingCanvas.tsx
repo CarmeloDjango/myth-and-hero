@@ -2,12 +2,16 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import { mirrorOp, renderAll, renderOp } from "@/lib/drawing/render";
+import { composeWithUnderlay, mirrorOp, renderAll, renderOp } from "@/lib/drawing/render";
 import { BRUSH_TOOLS, CANVAS_SIZE, STAMP_SHAPES, type BrushTool, type StampShape, type Stroke } from "@/lib/heroes/rules";
 import { BRUSHES, PEN_COLORS, PEN_SIZES, roundPoint, STAMP_SIZES, STAMPS } from "@/lib/heroes/strokes";
 
 export type DrawingCanvasHandle = {
-  /** 지금 그림을 PNG로 (1024×1024, 배경 투명. 채우기로 칠한 곳은 그 색) */
+  /**
+   * 지금 그림 (1024×1024)
+   * - 밑그림 사진이 없으면 PNG (배경 투명, 채우기로 칠한 곳은 그 색)
+   * - 사진이 있으면 사진 + 덧그림을 합친 JPEG
+   */
   exportPng: () => Promise<Blob | null>;
 };
 
@@ -15,6 +19,8 @@ type Props = {
   initialStrokes: Stroke[];
   /** 그림 뒤에 깔리는 색 (진영 색). PNG에는 들어가지 않습니다. */
   background: string;
+  /** 밑그림 사진 주소 (1024×1024). 그 위에 덧그리고, 채우기는 사진의 선도 경계로 봅니다. */
+  underlay?: string | null;
   onChange: (strokes: Stroke[]) => void;
 };
 
@@ -34,9 +40,34 @@ const RECENT_MAX = 6;
  * 그린 기록은 순서대로 저장되어 되돌리기·다시 보기에 씁니다.
  */
 export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function DrawingCanvas(
-  { initialStrokes, background, onChange },
+  { initialStrokes, background, underlay = null, onChange },
   ref,
 ) {
+  // 밑그림 사진: 화면에는 <img>로 캔버스 아래에 깔고, 채우기·내보내기에는 이 이미지 객체를 씁니다.
+  const [loadedUnder, setLoadedUnder] = useState<{ src: string; img: HTMLImageElement } | null>(null);
+  const underImg = underlay && loadedUnder?.src === underlay ? loadedUnder.img : null;
+  // 내보내기가 사진을 다 불러오기 전에 불리면 기다립니다 (사진 없이 저장되지 않게).
+  const underLoad = useRef<Promise<HTMLImageElement | null>>(Promise.resolve(null));
+  useEffect(() => {
+    if (!underlay) {
+      underLoad.current = Promise.resolve(null);
+      return;
+    }
+    let alive = true;
+    const img = new Image();
+    underLoad.current = new Promise((resolve) => {
+      img.onload = () => {
+        if (alive) setLoadedUnder({ src: underlay, img });
+        resolve(img);
+      };
+      img.onerror = () => resolve(null);
+    });
+    img.src = underlay;
+    return () => {
+      alive = false;
+    };
+  }, [underlay]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -71,8 +102,8 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
     committedRef.current = c;
     c.width = CANVAS_SIZE;
     c.height = CANVAS_SIZE;
-    renderAll(c.getContext("2d", { willReadFrequently: true })!, list);
-  }, []);
+    renderAll(c.getContext("2d", { willReadFrequently: true })!, list, underImg);
+  }, [underImg]);
 
   const paint = useCallback(() => {
     frame.current = null;
@@ -85,10 +116,10 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
     if (cur) {
       // 그리는 중인 획은 보이는 캔버스에만 미리 그립니다 (거울 모드면 반대쪽도).
       // 보이는 캔버스에는 확정된 그림이 복사돼 있어서, 지우개(destination-out)도 그대로 미리 보입니다.
-      renderOp(ctx, cur, false);
-      if (mirror) renderOp(ctx, mirrorOp(cur), false);
+      renderOp(ctx, cur, false, underImg);
+      if (mirror) renderOp(ctx, mirrorOp(cur), false, underImg);
     }
-  }, [mirror]);
+  }, [mirror, underImg]);
 
   const schedulePaint = useCallback(() => {
     frame.current ??= requestAnimationFrame(paint);
@@ -100,12 +131,17 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
   }, [ops, rebuildCommitted, paint]);
 
   useImperativeHandle(ref, () => ({
-    exportPng: () =>
-      new Promise((resolve) => {
-        const c = committedRef.current;
-        if (!c) return resolve(null);
-        c.toBlob((b) => resolve(b), "image/png");
-      }),
+    exportPng: async () => {
+      const under = await underLoad.current;
+      const c = committedRef.current;
+      if (!c) return null;
+      // 사진을 막 불러왔으면 채우기 경계가 바뀌므로 그리기 층을 다시 그립니다.
+      if (under && under !== underImg) renderAll(c.getContext("2d", { willReadFrequently: true })!, ops, under);
+      return new Promise<Blob | null>((resolve) => {
+        if (under) composeWithUnderlay(c, under).toBlob((b) => resolve(b), "image/jpeg", 0.9);
+        else c.toBlob((b) => resolve(b), "image/png");
+      });
+    },
   }));
 
   const commit = (added: Stroke[]) => {
@@ -378,6 +414,10 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, Props>(function Dra
           className="absolute inset-0 origin-top-left"
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}
         >
+          {underlay ? (
+            // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 사진 / 방금 고른 사진(blob:)
+            <img src={underlay} alt="" data-underlay draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none bg-paper" />
+          ) : null}
           <canvas
             ref={canvasRef}
             width={CANVAS_SIZE}

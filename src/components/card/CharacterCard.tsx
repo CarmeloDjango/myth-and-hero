@@ -41,7 +41,7 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
           <span className="absolute bottom-2.5 left-3 rounded-button border-2 border-green bg-paper px-2 py-0.5 text-[11px] font-bold text-green-ink">
             나만의 카드
           </span>
-        ) : (
+        ) : c.imageSrc ? null : (
           <span className="absolute bottom-2.5 left-3 rounded-button bg-paper px-2 py-0.5 text-[11px] font-bold text-muted">
             일러스트 자리
           </span>

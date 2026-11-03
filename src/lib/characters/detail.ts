@@ -84,12 +84,14 @@ export type CharacterDetail = {
   faction: { name: string; color: string | null } | null;
   /** 아이가 만든 카드("나만의 카드")인지 */
   isFamily: boolean;
-  /** 아이가 그린 그림 주소 (없으면 null) */
+  /** 카드 그림 주소: 아이가 만든 영웅의 그림, 또는 공식 인물에 우리 가족이 붙인 그림 (없으면 null) */
   imageSrc: string | null;
   /** 만든 아이 별명 (나만의 카드일 때) */
   creatorNickname: string | null;
-  /** 그린 과정 다시 보기용 영웅 id (그림이 있는 나만의 카드일 때만) */
-  replayId: string | null;
+  /** 만든 아이 프로필 id (나만의 카드일 때. 그림 고치기 권한 확인용) */
+  creatorId: string | null;
+  /** 그린 과정 다시 보기용 그림 라우트 주소 (그리기 기록이 있을 때만) */
+  replaySource: string | null;
   series: { slug: string; name: string; statLabels: StatLabels };
   related: RelatedCharacter[];
   prev: { slug: string; name: string } | null;

@@ -5,21 +5,20 @@ import { randomBytes } from "node:crypto";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { STAT_KEYS, toStatLabels } from "@/lib/characters/browse";
 import { getDb } from "@/lib/db";
-import { validateDrawingUpload } from "@/lib/drawing/upload";
+import { pictureFiles, readStrokes, writePicture } from "@/lib/drawing/picture";
 import {
   composeStory,
   heroNameSchema,
   heroStatsSchema,
   stepIndex,
   storyAnswersSchema,
-  strokesSchema,
   type Stroke,
   type StoryAnswers,
   type WizardStepKey,
 } from "@/lib/heroes/rules";
 import { visibleSeriesWhere } from "@/lib/queries/visibility";
 import { buildSearchText, toChoseong } from "@/lib/search/choseong";
-import { drawingKeys, getDrawingStore, type DrawingStore } from "@/lib/storage";
+import { getDrawingStore, type DrawingStore } from "@/lib/storage";
 
 /**
  * 아이가 만드는 영웅 (docs/HERO_MAKER.md 3장)
@@ -40,7 +39,7 @@ const fail = (error: string) => ({ ok: false as const, error });
 async function findOwnHero(db: PrismaClient, ctx: HeroCtx, heroId: string) {
   return db.character.findFirst({
     where: { id: heroId, familyId: ctx.familyId, creatorId: ctx.profileId },
-    select: { id: true, slug: true, seriesId: true, status: true, wizardStep: true, name: true, wizardData: true, imageUrl: true, strokesUrl: true },
+    select: { id: true, slug: true, seriesId: true, status: true, wizardStep: true, name: true, wizardData: true, imageUrl: true, strokesUrl: true, backgroundUrl: true },
   });
 }
 
@@ -139,58 +138,65 @@ export async function saveHeroName(ctx: HeroCtx, heroId: string, input: unknown,
   return { ok: true };
 }
 
-/** 그림 저장: PNG와 획 데이터를 새 버전 키로 올리고, 이전 버전은 지웁니다. */
+/**
+ * 그림 저장: 그림(PNG, 사진이 있으면 JPEG)과 획 데이터를 새 버전 키로 올리고, 이전 버전은 지웁니다.
+ * 완성한 영웅도 만든 아이는 그림을 다시 고칠 수 있습니다.
+ */
 export async function saveHeroDrawing(
   ctx: HeroCtx,
   heroId: string,
-  input: { png: Uint8Array; strokesJson: string },
+  input: { png: Uint8Array; strokesJson: string; background?: Uint8Array | null },
   d?: Deps,
 ): Promise<Result<{ version: string }>> {
   const { db, store } = deps(d);
   const hero = await findOwnHero(db, ctx, heroId);
   if (!hero) return fail("내가 만든 영웅이 아니에요.");
 
-  const checked = validateDrawingUpload(input.png, input.strokesJson);
-  if (!checked.ok) return fail(checked.error);
-  const strokes = checked.strokes;
-
-  const version = `${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
-  const keys = drawingKeys(ctx.familyId, hero.id, version);
-  await store.put(keys.png, input.png, "image/png");
-  await store.put(keys.strokes, JSON.stringify(strokes), "application/json");
+  const written = await writePicture(
+    store,
+    `families/${ctx.familyId}/heroes/${hero.id}`,
+    { image: hero.imageUrl, strokes: hero.strokesUrl, background: hero.backgroundUrl },
+    { image: input.png, strokesJson: input.strokesJson, background: input.background },
+  );
+  if (!written.ok) return fail(written.error);
+  const { keys } = written;
 
   await db.character.update({
     where: { id: hero.id },
-    data: { imageUrl: keys.png, strokesUrl: keys.strokes, wizardStep: advance(hero.wizardStep, "draw") },
+    data: { imageUrl: keys.image, strokesUrl: keys.strokes, backgroundUrl: keys.background, wizardStep: advance(hero.wizardStep, "draw") },
   });
-
   // 이전 버전 정리 (실패해도 새 그림은 이미 저장됐으므로 무시)
-  const old = [hero.imageUrl, hero.strokesUrl].filter((k): k is string => !!k && k.startsWith("families/"));
-  await store.deleteMany(old).catch(() => {});
-  return { ok: true, version };
+  await store.deleteMany(written.stale).catch(() => {});
+  return { ok: true, version: keys.image!.split("/").at(-2)! };
 }
 
 /**
- * 저장된 그리기 기록 (이어 그리기, 그린 과정 다시 보기)
+ * 이어 그리기·그린 과정 보기용 원본: 그리기 기록과 밑그림 사진 키
  * - 만드는 중(초안): 만든 아이만
  * - 완성: 같은 가족 누구나 (형제도 "그린 과정 보기" 가능)
  */
-export async function getHeroStrokes(
+export async function getHeroDrawingSource(
   ctx: { familyId: string; profileId: string | null },
   heroId: string,
   d?: Deps,
-): Promise<Stroke[] | null> {
+): Promise<{ strokes: Stroke[]; backgroundKey: string | null } | null> {
   const { db, store } = deps(d);
   const hero = await db.character.findFirst({
     where: { id: heroId, familyId: ctx.familyId },
-    select: { strokesUrl: true, status: true, creatorId: true },
+    select: { strokesUrl: true, backgroundUrl: true, status: true, creatorId: true },
   });
-  if (!hero?.strokesUrl) return null;
+  if (!hero) return null;
   if (hero.status === "DRAFT" && hero.creatorId !== ctx.profileId) return null;
-  const obj = await store.get(hero.strokesUrl);
-  if (!obj) return null;
-  const parsed = strokesSchema.safeParse(JSON.parse(new TextDecoder().decode(obj.body)));
-  return parsed.success ? parsed.data : null;
+  const strokes = await readStrokes(store, hero.strokesUrl);
+  const backgroundKey = hero.backgroundUrl?.startsWith("families/") ? hero.backgroundUrl : null;
+  if (!strokes && !backgroundKey) return null;
+  return { strokes: strokes ?? [], backgroundKey };
+}
+
+/** 저장된 그리기 기록 (권한은 getHeroDrawingSource와 같음) */
+export async function getHeroStrokes(ctx: { familyId: string; profileId: string | null }, heroId: string, d?: Deps): Promise<Stroke[] | null> {
+  const src = await getHeroDrawingSource(ctx, heroId, d);
+  return src && src.strokes.length ? src.strokes : src?.backgroundKey ? [] : null;
 }
 
 /** 그림 없이 다음 단계로 넘어가기 */
@@ -288,7 +294,7 @@ export async function deleteOwnDraft(ctx: HeroCtx, heroId: string, d?: Deps): Pr
   if (!hero) return fail("내가 만든 영웅이 아니에요.");
   if (hero.status !== "DRAFT") return fail("완성한 영웅은 부모님만 지울 수 있어요.");
   await db.character.delete({ where: { id: hero.id } });
-  await store.deleteMany([hero.imageUrl, hero.strokesUrl].filter((k): k is string => !!k?.startsWith("families/"))).catch(() => {});
+  await store.deleteMany(pictureFiles(hero)).catch(() => {});
   return { ok: true };
 }
 
@@ -343,10 +349,10 @@ export async function setFamilyHeroHidden(familyId: string, heroId: string, hidd
 
 export async function deleteFamilyHero(familyId: string, heroId: string, d?: Deps): Promise<Result> {
   const { db, store } = deps(d);
-  const hero = await db.character.findFirst({ where: { id: heroId, familyId }, select: { id: true, imageUrl: true, strokesUrl: true } });
+  const hero = await db.character.findFirst({ where: { id: heroId, familyId }, select: { id: true, imageUrl: true, strokesUrl: true, backgroundUrl: true } });
   if (!hero) return fail("우리 가족 영웅이 아니에요.");
   await db.character.delete({ where: { id: hero.id } });
-  await store.deleteMany([hero.imageUrl, hero.strokesUrl].filter((k): k is string => !!k?.startsWith("families/"))).catch(() => {});
+  await store.deleteMany(pictureFiles(hero)).catch(() => {});
   return { ok: true };
 }
 
@@ -363,3 +369,12 @@ export async function getHeroImageKey(familyId: string, profileId: string | null
 }
 
 export { heroImageSrc } from "./image";
+
+/** 그림 고치기 화면용: 내가 만든 영웅 (완성작 포함) */
+export async function getOwnHeroForPicture(ctx: HeroCtx, seriesSlug: string, slug: string, d?: Deps) {
+  const { db } = deps(d);
+  return db.character.findFirst({
+    where: { slug, familyId: ctx.familyId, creatorId: ctx.profileId, series: { slug: seriesSlug } },
+    select: { id: true, name: true, status: true, imageUrl: true, strokesUrl: true, backgroundUrl: true, faction: { select: { color: true } } },
+  });
+}

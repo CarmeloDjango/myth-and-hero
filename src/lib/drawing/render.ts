@@ -149,18 +149,38 @@ function parseHex(color: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+/** 밑그림 사진 (그리기 캔버스 아래에 깔리는 1024×1024 이미지) */
+export type Underlay = CanvasImageSource | null | undefined;
+
+/** 사진 + 지금까지 그린 그림을 합친 픽셀 (사진 위 채우기의 경계 찾기용) */
+function compositePixels(ctx: CanvasRenderingContext2D, under: CanvasImageSource): Uint8ClampedArray {
+  const c = document.createElement("canvas");
+  c.width = c.height = CANVAS_SIZE;
+  const x = c.getContext("2d", { willReadFrequently: true })!;
+  x.fillStyle = "#fff";
+  x.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  x.drawImage(under, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  x.drawImage(ctx.canvas, 0, 0);
+  return x.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE).data;
+}
+
 /**
  * 채우기: (x, y)와 이어진 비슷한 색 영역을 칠합니다 (스캔라인 방식).
  * 선 가장자리의 반투명 픽셀은 채운 색과 섞어서, 칠한 경계에 흰 틈이 남지 않게 합니다.
+ * 밑그림 사진이 있으면 사진의 선(종이에 그린 그림)도 경계로 봅니다. 칠은 그리기 층에만 들어가서
+ * 사진은 그대로 남습니다. 사진은 종이 결·그림자 때문에 색이 고르지 않아 허용 범위를 넓힙니다.
  */
-export function floodFill(ctx: CanvasRenderingContext2D, op: FillOp, tolerance = 48) {
+export function floodFill(ctx: CanvasRenderingContext2D, op: FillOp, tolerance = 48, under?: Underlay) {
   const W = CANVAS_SIZE;
   const H = CANVAS_SIZE;
   const sx = Math.floor(op.x);
   const sy = Math.floor(op.y);
   if (sx < 0 || sy < 0 || sx >= W || sy >= H) return;
   const img = ctx.getImageData(0, 0, W, H);
-  const d = img.data;
+  const layer = img.data;
+  // 경계를 찾을 픽셀: 사진이 있으면 사진 + 그림, 없으면 그림 층
+  const d = under ? compositePixels(ctx, under) : layer;
+  if (under) tolerance = Math.max(tolerance, 80);
   const at = (x: number, y: number) => (y * W + x) * 4;
   const s = at(sx, sy);
   const target = [d[s], d[s + 1], d[s + 2], d[s + 3]];
@@ -204,10 +224,10 @@ export function floodFill(ctx: CanvasRenderingContext2D, op: FillOp, tolerance =
   for (let p = 0; p < W * H; p++) {
     if (!filled[p]) continue;
     const i = p * 4;
-    d[i] = fr;
-    d[i + 1] = fg;
-    d[i + 2] = fb;
-    d[i + 3] = 255;
+    layer[i] = fr;
+    layer[i + 1] = fg;
+    layer[i + 2] = fb;
+    layer[i + 3] = 255;
   }
   // 가장자리 1픽셀: 반투명 선 픽셀 밑에 채운 색을 깔아 섞습니다.
   for (let y = 0; y < H; y++) {
@@ -218,27 +238,42 @@ export function floodFill(ctx: CanvasRenderingContext2D, op: FillOp, tolerance =
         (x > 0 && filled[p - 1]) || (x < W - 1 && filled[p + 1]) || (y > 0 && filled[p - W]) || (y < H - 1 && filled[p + W]);
       if (!near) continue;
       const i = p * 4;
-      const a = d[i + 3] / 255;
+      const a = layer[i + 3] / 255;
       if (a >= 0.98) continue;
-      d[i] = Math.round(d[i] * a + fr * (1 - a));
-      d[i + 1] = Math.round(d[i + 1] * a + fg * (1 - a));
-      d[i + 2] = Math.round(d[i + 2] * a + fb * (1 - a));
-      d[i + 3] = 255;
+      // 사진 위에서는 그림 층이 비어 있는 경계 픽셀(사진의 선)을 덮지 않습니다.
+      if (under && a < 0.02) continue;
+      layer[i] = Math.round(layer[i] * a + fr * (1 - a));
+      layer[i + 1] = Math.round(layer[i + 1] * a + fg * (1 - a));
+      layer[i + 2] = Math.round(layer[i + 2] * a + fb * (1 - a));
+      layer[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
 }
 
 /** 기록 하나 그리기. last=false면 그리는 중인 획(끝이 아직 열려 있음) */
-export function renderOp(ctx: CanvasRenderingContext2D, op: Stroke, last = true) {
+export function renderOp(ctx: CanvasRenderingContext2D, op: Stroke, last = true, under?: Underlay) {
   if (isBrushOp(op)) drawBrush(ctx, op, last);
   else if (op.tool === "stamp") drawStamp(ctx, op);
-  else floodFill(ctx, op);
+  else floodFill(ctx, op, undefined, under);
 }
 
-export function renderAll(ctx: CanvasRenderingContext2D, ops: Stroke[]) {
+/** 그리기 층 전체 다시 그리기 (사진은 그리지 않음. 채우기의 경계로만 씀) */
+export function renderAll(ctx: CanvasRenderingContext2D, ops: Stroke[], under?: Underlay) {
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-  for (const op of ops) renderOp(ctx, op, true);
+  for (const op of ops) renderOp(ctx, op, true, under);
+}
+
+/** 사진 + 그리기 층을 합친 완성 그림 (JPEG로 내보낼 때) */
+export function composeWithUnderlay(layer: HTMLCanvasElement, under: CanvasImageSource): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = c.height = CANVAS_SIZE;
+  const x = c.getContext("2d")!;
+  x.fillStyle = "#fff";
+  x.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  x.drawImage(under, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  x.drawImage(layer, 0, 0);
+  return c;
 }
 
 /** 거울 모드: 가운데 세로선을 기준으로 뒤집은 기록 */

@@ -12,7 +12,8 @@ const unitsOf = (op: Stroke) => (isBrushOp(op) ? op.points.length : 10);
  * 그린 과정 다시 보기 (타임랩스)
  * 저장된 그리기 기록을 순서대로, 붓 획은 점 단위로 조금씩 그려서 보여줍니다.
  */
-export function DrawingReplay({ heroId, name, background }: { heroId: string; name: string; background: string }) {
+/** source: 그림 라우트 주소 (/api/heroes/:id/drawing, /api/characters/:id/picture) */
+export function DrawingReplay({ source, name, background }: { source: string; name: string; background: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -26,28 +27,38 @@ export function DrawingReplay({ heroId, name, background }: { heroId: string; na
         </svg>
         그린 과정 보기
       </button>
-      {open ? <ReplayDialog heroId={heroId} name={name} background={background} onClose={() => setOpen(false)} /> : null}
+      {open ? <ReplayDialog source={source} name={name} background={background} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
 
-function ReplayDialog({ heroId, name, background, onClose }: { heroId: string; name: string; background: string; onClose: () => void }) {
+function ReplayDialog({ source, name, background, onClose }: { source: string; name: string; background: string; onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ops, setOps] = useState<Stroke[] | null>(null);
+  /** 밑그림 사진 (있으면 사진을 먼저 깔고, 채우기는 사진의 선도 경계로 봄) */
+  const [under, setUnder] = useState<{ src: string; img: HTMLImageElement } | null>(null);
   const [error, setError] = useState(false);
   const [run, setRun] = useState(0);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/heroes/${heroId}/drawing?strokes=1`)
+    fetch(`${source}?strokes=1`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: { strokes: Stroke[] }) => alive && setOps(d.strokes))
+      .then(async (d: { strokes: Stroke[]; background?: string | null }) => {
+        if (d.background) {
+          const img = new Image();
+          img.src = d.background;
+          await img.decode().catch(() => {});
+          if (alive) setUnder({ src: d.background, img });
+        }
+        if (alive) setOps(d.strokes);
+      })
       .catch(() => alive && setError(true));
     return () => {
       alive = false;
     };
-  }, [heroId]);
+  }, [source]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -75,7 +86,7 @@ function ReplayDialog({ heroId, name, background, onClose }: { heroId: string; n
       const target = Math.min(total, ((now - start) / durationMs) * total);
       // 다 그린 기록은 완성 캔버스로 옮깁니다.
       while (opIndex < ops.length && consumed + unitsOf(ops[opIndex]) <= target) {
-        renderOp(fctx, ops[opIndex], true);
+        renderOp(fctx, ops[opIndex], true, under?.img);
         consumed += unitsOf(ops[opIndex]);
         opIndex++;
       }
@@ -92,7 +103,7 @@ function ReplayDialog({ heroId, name, background, onClose }: { heroId: string; n
     setDone(false);
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [ops, run]);
+  }, [ops, run, under]);
 
   return (
     <div
@@ -110,6 +121,10 @@ function ReplayDialog({ heroId, name, background, onClose }: { heroId: string; n
           </button>
         </div>
         <div className="relative aspect-square w-full overflow-hidden rounded-card border-2 border-line" style={{ background }}>
+          {under ? (
+            // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 사진
+            <img src={under.src} alt="" className="absolute inset-0 h-full w-full bg-paper" />
+          ) : null}
           <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} data-replay-done={done || undefined} className="absolute inset-0 h-full w-full" />
           {!ops && !error ? (
             <p role="status" className="absolute inset-0 flex items-center justify-center font-bold text-muted">

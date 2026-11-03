@@ -17,7 +17,7 @@ import {
   type RelatedCharacter,
 } from "@/lib/characters/detail";
 import { getDb } from "@/lib/db";
-import { heroImageSrc } from "@/lib/heroes/image";
+import { characterPictureSrc, heroImageSrc } from "@/lib/heroes/image";
 import { isChoseongOnly } from "@/lib/search/choseong";
 
 import { visibleCharacterWhere, visibleSeriesWhere } from "./visibility";
@@ -80,6 +80,8 @@ export async function getCharacterPage(
         stat3: true,
         familyId: true,
         imageUrl: true,
+        // 공식 인물에 우리 가족이 붙인 그림
+        familyPictures: { where: { familyId: familyId ?? "-" }, select: { imageUrl: true }, take: 1 },
         kind: { select: { name: true } },
         faction: { select: { name: true, color: true } },
       },
@@ -103,7 +105,7 @@ export async function getCharacterPage(
       faction: r.faction,
       kindName: r.kind?.name ?? null,
       isFamily: r.familyId !== null,
-      imageSrc: heroImageSrc(r),
+      imageSrc: heroImageSrc(r) ?? characterPictureSrc(r.id, r.familyPictures[0]?.imageUrl),
     })),
     nextCursor: hasMore ? page[page.length - 1].id : null,
     total,
@@ -195,6 +197,9 @@ export async function getCharacterDetail(
       seriesId: true,
       familyId: true,
       imageUrl: true,
+      strokesUrl: true,
+      creatorId: true,
+      familyPictures: { where: { familyId: familyId ?? "-" }, select: { imageUrl: true, strokesUrl: true }, take: 1 },
       creator: { select: { nickname: true } },
       kind: { select: { name: true } },
       faction: { select: { name: true, color: true } },
@@ -202,6 +207,7 @@ export async function getCharacterDetail(
     },
   });
   if (!c) return null;
+  const picture = c.familyId ? null : c.familyPictures[0];
 
   const relatedSelect = {
     slug: true,
@@ -261,9 +267,15 @@ export async function getCharacterDetail(
     stats: { stat1: c.stat1, stat2: c.stat2, stat3: c.stat3, stat4: c.stat4, stat5: c.stat5 },
     faction: c.faction,
     isFamily: c.familyId !== null,
-    imageSrc: heroImageSrc(c),
+    imageSrc: heroImageSrc(c) ?? characterPictureSrc(c.id, picture?.imageUrl),
     creatorNickname: c.creator?.nickname ?? null,
-    replayId: c.familyId && c.imageUrl ? c.id : null,
+    creatorId: c.creatorId,
+    replaySource:
+      c.familyId && c.strokesUrl
+        ? `/api/heroes/${c.id}/drawing`
+        : !c.familyId && picture?.strokesUrl
+          ? `/api/characters/${c.id}/picture`
+          : null,
     series: { slug: c.series.slug, name: c.series.name, statLabels: toStatLabels(c.series.statLabels) },
     related,
     prev,

@@ -56,7 +56,7 @@ async function Done({ id }: { id: string }) {
         <p className="p-4 font-display text-3xl">{hero.name}</p>
       </div>
       <div className="flex flex-wrap justify-center gap-3">
-        {src ? <DrawingReplay heroId={hero.id} name={hero.name} background={faction?.color ?? "#f7f7f7"} /> : null}
+        {src ? <DrawingReplay source={`/api/heroes/${hero.id}/drawing`} name={hero.name} background={faction?.color ?? "#f7f7f7"} /> : null}
         <Link
           href={`/${hero.series.slug}/${hero.slug}`}
           className="pressable inline-flex min-h-14 items-center rounded-button border-b-4 border-green-dark bg-green px-6 text-[17px] font-bold tracking-[0.053em] text-paper"
