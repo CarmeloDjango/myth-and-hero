@@ -29,7 +29,7 @@ export async function GET(request: Request, { params }: RouteContext<"/api/heroe
       { headers: { "Cache-Control": "private, no-store" } },
     );
   }
-  return storedFileResponse(await getHeroImageKey(ctx.familyId, ctx.profileId, id));
+  return storedFileResponse(await getHeroImageKey(ctx.familyId, ctx.profileId, id), search.get("size"));
 }
 
 export async function POST(request: Request, { params }: RouteContext<"/api/heroes/[id]/drawing">) {

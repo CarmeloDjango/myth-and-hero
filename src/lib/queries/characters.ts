@@ -17,7 +17,7 @@ import {
   type RelatedCharacter,
 } from "@/lib/characters/detail";
 import { getDb } from "@/lib/db";
-import { characterPictureSrc, heroImageSrc } from "@/lib/heroes/image";
+import { characterPictureSrc, heroImageSrc, isPhotoPicture } from "@/lib/heroes/image";
 import { isChoseongOnly } from "@/lib/search/choseong";
 
 import { visibleCharacterWhere, visibleSeriesWhere } from "./visibility";
@@ -105,7 +105,9 @@ export async function getCharacterPage(
       faction: r.faction,
       kindName: r.kind?.name ?? null,
       isFamily: r.familyId !== null,
-      imageSrc: heroImageSrc(r) ?? characterPictureSrc(r.id, r.familyPictures[0]?.imageUrl),
+      // 목록은 작은 그림(384px)
+      imageSrc: heroImageSrc(r, "thumb") ?? characterPictureSrc(r.id, r.familyPictures[0]?.imageUrl, "thumb"),
+      imageCover: isPhotoPicture(r.imageUrl ?? r.familyPictures[0]?.imageUrl),
     })),
     nextCursor: hasMore ? page[page.length - 1].id : null,
     total,
@@ -268,6 +270,7 @@ export async function getCharacterDetail(
     faction: c.faction,
     isFamily: c.familyId !== null,
     imageSrc: heroImageSrc(c) ?? characterPictureSrc(c.id, picture?.imageUrl),
+    imageCover: isPhotoPicture(c.imageUrl ?? picture?.imageUrl),
     creatorNickname: c.creator?.nickname ?? null,
     creatorId: c.creatorId,
     replaySource:

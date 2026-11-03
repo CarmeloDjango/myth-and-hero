@@ -8,7 +8,7 @@ import { STAT_KEYS, type StatKey } from "@/lib/characters/browse";
 import { josa } from "@/lib/text/josa";
 
 /** 5칸 합계 최대 점수 (확정) */
-export const HERO_STAT_BUDGET = 250;
+export const HERO_STAT_BUDGET = 350;
 /** 한 칸 최대 점수 */
 export const HERO_STAT_MAX = 100;
 export const HERO_NAME_MAX = 12;
@@ -21,7 +21,7 @@ export const WIZARD_STEPS = [
   { key: "name", label: "이름", question: "영웅의 이름은 뭐예요?" },
   { key: "draw", label: "모습", question: "영웅을 그려 볼까요?" },
   { key: "kind", label: "종류와 편", question: "어떤 영웅이에요? 누구 편이에요?" },
-  { key: "stats", label: "능력치", question: "250점을 능력치에 나눠 주세요!" },
+  { key: "stats", label: "능력치", question: `${HERO_STAT_BUDGET}점을 능력치에 나눠 주세요!` },
   { key: "story", label: "이야기", question: "영웅의 이야기를 들려줘요!" },
   { key: "done", label: "완성", question: "이제 도감에 넣어 볼까요?" },
 ] as const;
@@ -147,3 +147,6 @@ export const MAX_PNG_BYTES = 2 * 1024 * 1024;
 export const MAX_STROKES_BYTES = 2 * 1024 * 1024;
 /** 밑그림 사진 (브라우저에서 1024px JPEG로 줄인 뒤) */
 export const MAX_BACKGROUND_BYTES = 2 * 1024 * 1024;
+/** 카드 목록용 작은 그림 (가로세로 384px) */
+export const THUMB_SIZE = 384;
+export const MAX_THUMB_BYTES = 512 * 1024;

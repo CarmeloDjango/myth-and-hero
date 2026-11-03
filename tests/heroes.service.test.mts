@@ -133,7 +133,7 @@ describe("영웅 만들기", () => {
   });
 
   test(`능력치: 합계 ${HERO_STAT_BUDGET}점 초과·칸당 100점 초과는 거절`, async () => {
-    const over = { stat1: 100, stat2: 100, stat3: 51, stat4: 0, stat5: 0 };
+    const over = { stat1: 100, stat2: 100, stat3: 100, stat4: HERO_STAT_BUDGET - 300 + 1, stat5: 0 };
     assert.equal((await heroes.saveHeroStats(kid1(), heroId, over)).ok, false);
     assert.equal((await heroes.saveHeroStats(kid1(), heroId, { stat1: 101, stat2: 0, stat3: 0, stat4: 0, stat5: 0 })).ok, false);
     assert.ok((await heroes.saveHeroStats(kid1(), heroId, { stat1: 50, stat2: 100, stat3: 60, stat4: 10, stat5: 30 })).ok);

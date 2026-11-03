@@ -204,7 +204,7 @@ function ChoiceGroup({
   );
 }
 
-/* ④ 능력치 나누기 (총 250점) */
+/* ④ 능력치 나누기 (총 HERO_STAT_BUDGET점) */
 export function StatsStep({ heroId, labels, stats }: { heroId: string; labels: StatLabels; stats: Record<StatKey, number> }) {
   const [state, action, pending] = useActionState(saveHeroStatsAction.bind(null, heroId), undefined);
   const [values, setValues] = useState(stats);

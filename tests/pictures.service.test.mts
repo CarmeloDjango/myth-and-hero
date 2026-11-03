@@ -94,6 +94,18 @@ describe("공식 인물에 가족 그림 붙이기", () => {
     assert.ok(page.items.find((i) => i.slug === official.slug)?.imageSrc?.startsWith(`/api/characters/${official.id}/picture`));
   });
 
+  test("작은 그림(thumb)도 같은 버전 폴더에 저장하고, 바꾸면 이전 것도 지움", async () => {
+    const ctx = { familyId: famA.id, profileId: famA.kid1 };
+    const r = await pictures.saveCharacterPicture(ctx, official.id, { png: JPEG, strokesJson: STROKES, thumb: JPEG });
+    assert.ok(r.ok);
+    const thumbs = keysOf(base()).filter((k) => k.endsWith("/thumb.jpg"));
+    assert.equal(thumbs.length, 1);
+    assert.equal((await pictures.saveCharacterPicture(ctx, official.id, { png: JPEG, strokesJson: STROKES, thumb: PNG })).ok, false, "그림과 형식이 다르면 거절");
+    const again = await pictures.saveCharacterPicture(ctx, official.id, { png: JPEG, strokesJson: STROKES });
+    assert.ok(again.ok);
+    assert.equal(keysOf(base()).filter((k) => k.includes("/thumb.")).length, 0, "이전 작은 그림 정리");
+  });
+
   test("형제가 바꾸면 이전 파일은 지우고, 사진은 그대로 유지", async () => {
     const before = keysOf(base());
     const bg = before.find((k) => k.includes("/bg/"))!;

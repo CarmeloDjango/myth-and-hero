@@ -2,7 +2,9 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 
-import { validateBackground, validateDrawingUpload } from "@/lib/drawing/upload";
+import { sniffImage, validateBackground, validateDrawingUpload } from "@/lib/drawing/upload";
+import { thumbKeyOf } from "@/lib/heroes/image";
+import { MAX_THUMB_BYTES } from "@/lib/heroes/rules";
 import { strokesSchema, type Stroke } from "@/lib/heroes/rules";
 import type { DrawingStore } from "@/lib/storage";
 
@@ -11,6 +13,7 @@ import type { DrawingStore } from "@/lib/storage";
  *
  * 저장소 키 (base = families/<가족>/heroes/<영웅> 같은 폴더):
  * - <base>/<버전>/drawing.png|jpg : 완성 그림 (사진이 있으면 사진 + 덧그림을 합친 JPEG)
+ * - <base>/<버전>/thumb.png|jpg   : 카드 목록용 작은 그림 (384px, 그림과 같은 형식)
  * - <base>/<버전>/strokes.json    : 그리기 기록 (이어 그리기, 그린 과정 보기)
  * - <base>/bg/<버전>.jpg          : 밑그림 사진. 그림을 저장할 때마다 바뀌지 않으므로 따로 둡니다.
  *
@@ -24,6 +27,8 @@ export type PictureInput = {
   strokesJson: string;
   /** undefined: 밑그림 그대로, null: 밑그림 빼기, 바이트: 새 밑그림 */
   background?: Uint8Array | null;
+  /** 카드 목록용 작은 그림 (없으면 목록도 큰 그림을 씀) */
+  thumb?: Uint8Array;
 };
 
 export const newVersion = () => `${Date.now().toString(36)}${randomBytes(3).toString("hex")}`;
@@ -42,6 +47,9 @@ export async function writePicture(
     const bg = validateBackground(input.background);
     if (!bg.ok) return bg;
   }
+  if (input.thumb && (input.thumb.byteLength > MAX_THUMB_BYTES || sniffImage(input.thumb) !== checked.contentType)) {
+    return { ok: false, error: "작은 그림 형식이 달라요." };
+  }
 
   const version = newVersion();
   const ext = checked.contentType === "image/jpeg" ? "jpg" : "png";
@@ -52,15 +60,16 @@ export async function writePicture(
   };
   if (input.background) await store.put(keys.background!, input.background, "image/jpeg");
   await store.put(keys.image!, input.image, checked.contentType);
+  if (input.thumb) await store.put(thumbKeyOf(keys.image!), input.thumb, checked.contentType);
   await store.put(keys.strokes!, JSON.stringify(checked.strokes), "application/json");
 
-  const stale = [prev.image, prev.strokes, prev.background !== keys.background ? prev.background : null].filter(owned);
+  const stale = [prev.image, prev.image ? thumbKeyOf(prev.image) : null, prev.strokes, prev.background !== keys.background ? prev.background : null].filter(owned);
   return { ok: true, keys, stale };
 }
 
 /** 지울 때: 이 그림이 쓰는 파일 키 전부 */
 export function pictureFiles(keys: { imageUrl?: string | null; strokesUrl?: string | null; backgroundUrl?: string | null }): string[] {
-  return [keys.imageUrl, keys.strokesUrl, keys.backgroundUrl].filter(owned);
+  return [keys.imageUrl, keys.imageUrl ? thumbKeyOf(keys.imageUrl) : null, keys.strokesUrl, keys.backgroundUrl].filter(owned);
 }
 
 export async function readStrokes(store: DrawingStore, key: string | null | undefined): Promise<Stroke[] | null> {

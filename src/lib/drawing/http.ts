@@ -1,6 +1,7 @@
 import "server-only";
 
 import { MAX_BACKGROUND_BYTES, MAX_PNG_BYTES, MAX_STROKES_BYTES } from "@/lib/heroes/rules";
+import { thumbKeyOf } from "@/lib/heroes/image";
 import { getDrawingStore } from "@/lib/storage";
 
 /**
@@ -11,8 +12,9 @@ import { getDrawingStore } from "@/lib/storage";
  * - strokes    : 그리기 기록 JSON
  * - background : 새 밑그림 사진 (JPEG) — 없으면 그대로
  * - clearBackground=1 : 밑그림 빼기
+ * - thumb      : 카드 목록용 작은 그림 (384px)
  */
-export type PictureForm = { png: Uint8Array; strokesJson: string; background?: Uint8Array | null };
+export type PictureForm = { png: Uint8Array; strokesJson: string; background?: Uint8Array | null; thumb?: Uint8Array };
 
 export async function readPictureForm(request: Request): Promise<PictureForm | Response> {
   const declared = Number(request.headers.get("content-length") ?? 0);
@@ -28,6 +30,7 @@ export async function readPictureForm(request: Request): Promise<PictureForm | R
   const png = form.get("png");
   const strokes = form.get("strokes");
   const background = form.get("background");
+  const thumb = form.get("thumb");
   if (!(png instanceof Blob) || typeof strokes !== "string") {
     return Response.json({ ok: false, error: "그림을 읽을 수 없어요." }, { status: 400 });
   }
@@ -36,13 +39,15 @@ export async function readPictureForm(request: Request): Promise<PictureForm | R
     strokesJson: strokes,
     background:
       background instanceof Blob ? new Uint8Array(await background.arrayBuffer()) : form.get("clearBackground") === "1" ? null : undefined,
+    thumb: thumb instanceof Blob ? new Uint8Array(await thumb.arrayBuffer()) : undefined,
   };
 }
 
 /** 저장소 파일 내려주기. 주소에 버전(?v=, ?bg=)이 있어서 오래 캐시해도 됩니다. 가족 전용이라 private. */
-export async function storedFileResponse(key: string | null | undefined): Promise<Response> {
+export async function storedFileResponse(key: string | null | undefined, size: string | null = null): Promise<Response> {
   if (!key) return new Response("Not found", { status: 404 });
-  const obj = await getDrawingStore().get(key);
+  // 작은 그림이 없으면(예전 그림) 큰 그림으로 대신합니다.
+  const obj = (size === "thumb" ? await getDrawingStore().get(thumbKeyOf(key)) : null) ?? (await getDrawingStore().get(key));
   if (!obj) return new Response("Not found", { status: 404 });
   const type = obj.contentType === "image/jpeg" ? "image/jpeg" : "image/png";
   return new Response(Buffer.from(obj.body), {

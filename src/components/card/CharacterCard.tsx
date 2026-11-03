@@ -25,7 +25,7 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
       <div className="relative flex h-[220px] items-center justify-center" style={{ background: tint }}>
         {c.imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림 (라우트 핸들러에서 권한 확인)
-          <img src={c.imageSrc} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain" />
+          <img src={c.imageSrc} alt="" loading="lazy" className={`absolute inset-0 h-full w-full ${c.imageCover ? "object-cover" : "object-contain"}`} />
         ) : (
           <span aria-hidden="true" className="font-display text-[120px] leading-none text-ink opacity-15">
             {glyph}
