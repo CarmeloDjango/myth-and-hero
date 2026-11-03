@@ -58,3 +58,24 @@ body {
   70% { transform: scale(1.05) rotate(2deg); opacity: 1; }
   100% { transform: scale(1) rotate(0); }
 }
+
+/* 카드 배틀: 피해 숫자가 떠오르기, 맞으면 흔들기, 카드 내기 */
+@keyframes float-up {
+  0% { transform: translate(-50%, 0) scale(0.8); opacity: 0; }
+  20% { transform: translate(-50%, -8px) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%, -48px) scale(1); opacity: 0; }
+}
+@keyframes hit-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px) rotate(-2deg); }
+  40% { transform: translateX(6px) rotate(2deg); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+@keyframes card-in {
+  0% { transform: translateY(24px) scale(0.85); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .battle-anim { animation: none !important; }
+}

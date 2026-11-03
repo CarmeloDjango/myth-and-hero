@@ -39,6 +39,14 @@ async function ViewerBadge() {
     <>
       {viewer.profile ? (
         <Link
+          href="/battle"
+          className="sticker pressable inline-flex min-h-12 items-center rounded-button px-4 text-[15px] font-bold tracking-[0.053em] text-muted hover:bg-paper-dim"
+        >
+          배틀
+        </Link>
+      ) : null}
+      {viewer.profile ? (
+        <Link
           href="/me/heroes"
           className="sticker pressable inline-flex min-h-12 items-center rounded-button px-4 text-[15px] font-bold tracking-[0.053em] text-muted hover:bg-paper-dim"
         >
