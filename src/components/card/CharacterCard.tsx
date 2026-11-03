@@ -22,7 +22,8 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
 
   return (
     <article className="sticker relative flex flex-col overflow-hidden rounded-card bg-paper transition-transform hover:-translate-y-1">
-      <div className="relative flex h-[220px] items-center justify-center" style={{ background: tint }}>
+      {/* 그림은 정사각형으로 그리므로 그림 칸도 정사각형 (잘리거나 띠가 생기지 않게) */}
+      <div className="relative flex aspect-square items-center justify-center" style={{ background: tint }}>
         {c.imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element -- 가족 전용 비공개 그림 (라우트 핸들러에서 권한 확인)
           <img src={c.imageSrc} alt="" loading="lazy" className={`absolute inset-0 h-full w-full ${c.imageCover ? "object-cover" : "object-contain"}`} />
@@ -78,7 +79,7 @@ export function CharacterCard({ c, labels }: { c: CharacterCardData; labels: Sta
 export function CharacterCardSkeleton() {
   return (
     <div aria-hidden="true" className="sticker flex animate-pulse flex-col overflow-hidden rounded-card">
-      <div className="h-[220px] bg-paper-dim" />
+      <div className="aspect-square bg-paper-dim" />
       <div className="flex flex-col gap-3 p-[18px]">
         <div className="h-3 w-20 rounded bg-line" />
         <div className="h-8 w-28 rounded bg-line" />
