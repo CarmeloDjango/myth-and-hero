@@ -51,6 +51,7 @@ export async function saveHeroKindAction(heroId: string, _prev: HeroFormState, f
   const result = await heroes.saveHeroKind(ctx, heroId, {
     kindId: (form.get("kindId") as string) || null,
     factionId: (form.get("factionId") as string) || null,
+    ability: (form.get("ability") as string) || null,
   });
   if (!result.ok) return { error: result.error };
   redirect(makeUrl(heroId, "stats"));

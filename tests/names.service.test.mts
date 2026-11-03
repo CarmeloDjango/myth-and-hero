@@ -150,3 +150,22 @@ test("영웅 별 = 능력치 합으로 (300 = ★5), 예산 300 넘으면 거절
   assert.equal(await rarity(), 4, "230점 → ★4");
   assert.equal((await heroes.saveHeroStats(kid, d.heroId, { stat1: 100, stat2: 100, stat3: 100, stat4: 1, stat5: 0 })).ok, false, "301점은 거절");
 });
+
+test("영웅 특별한 힘 저장: 고른 힘이 배틀 카드에, 없음은 숫자 +1, 잘못된 값 거절", async () => {
+  const { getBattlePool } = await import("../src/lib/queries/battle");
+  const kid = { familyId: famA.id, profileId: famA.kid2 };
+  const d = await heroes.createHeroDraft(kid, guanyu.seriesSlug);
+  assert.ok(d.ok);
+  assert.ok((await heroes.saveHeroName(kid, d.heroId, { name: "불꽃소년" })).ok);
+  assert.ok((await heroes.saveHeroStats(kid, d.heroId, { stat1: 100, stat2: 100, stat3: 100, stat4: 0, stat5: 0 })).ok);
+  assert.ok((await heroes.saveHeroKind(kid, d.heroId, { kindId: null, factionId: null, ability: "fire" })).ok);
+  assert.ok((await heroes.finishHero(kid, d.heroId)).ok);
+  let card = (await getBattlePool(famA.id)).find((c) => c.id === d.heroId)!;
+  assert.equal(card.ability, "fire");
+  assert.equal(card.attack + card.health, card.cost * 2, "힘이 있으면 비용×2+1-1");
+  assert.ok((await heroes.saveHeroKind(kid, d.heroId, { kindId: null, factionId: null, ability: "none" })).ok);
+  card = (await getBattlePool(famA.id)).find((c) => c.id === d.heroId)!;
+  assert.equal(card.ability, null);
+  assert.equal(card.attack + card.health, card.cost * 2 + 1, "없음이면 숫자 +1");
+  assert.equal((await heroes.saveHeroKind(kid, d.heroId, { kindId: null, factionId: null, ability: "laser" })).ok, false);
+});

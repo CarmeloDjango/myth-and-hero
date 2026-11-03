@@ -248,6 +248,11 @@ export function applyAction(state: BattleState, a: Action): BattleState {
     });
     s = { ...s, nextUid: s.nextUid + 1, events: [{ type: "play", side, uid }] };
     if (card.ability === "scheme") s = drawCards(s, side, 1);
+    if (card.ability === "fire") {
+      const foe = s.players[foeSide];
+      s = setPlayer(s, foeSide, { ...foe, leader: { ...foe.leader, hp: foe.leader.hp - 2 } });
+      s = checkWinner({ ...s, events: [...s.events, { type: "damage", side: foeSide, target: "leader", amount: 2 }] });
+    }
     if (card.ability === "divine") {
       const foe = s.players[foeSide];
       s = setPlayer(s, foeSide, { ...foe, board: foe.board.map((u) => ({ ...u, health: u.health - 1 })) });

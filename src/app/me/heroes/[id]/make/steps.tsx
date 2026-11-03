@@ -13,7 +13,9 @@ import {
   skipHeroDrawingAction,
 } from "@/app/actions/heroes";
 import { AutosaveDrawing } from "@/components/drawing/AutosaveDrawing";
+import { ReadAloudButton } from "@/components/speech/ReadAloudButton";
 import { FormError, PrimaryButton, TextField } from "@/components/ui/form";
+import { ABILITIES, ABILITY_CHOICES, isAbility, resolveAbility } from "@/lib/battle/cards";
 import { STAT_KEYS, type StatKey, type StatLabels } from "@/lib/characters/browse";
 import {
   HERO_NAME_MAX,
@@ -128,29 +130,48 @@ export function DrawStep({ heroId, background, hasDrawing }: { heroId: string; b
   );
 }
 
-/* ③ 종류와 편 */
+/* ③ 종류와 편, 특별한 힘 */
 export function KindStep({
   heroId,
   kinds,
   factions,
   kindId,
   factionId,
+  ability,
+  officialSeries,
 }: {
   heroId: string;
   kinds: { id: string; name: string }[];
   factions: { id: string; name: string; color: string | null }[];
   kindId: string | null;
   factionId: string | null;
+  /** 저장된 특별한 힘 (null이면 아직 안 고름 → 종류에 맞는 힘을 먼저 골라 둠) */
+  ability: string | null;
+  officialSeries: boolean;
 }) {
   const [state, action, pending] = useActionState(saveHeroKindAction.bind(null, heroId), undefined);
   const [k, setK] = useState(kindId ?? "");
   const [f, setF] = useState(factionId ?? "");
+  // 아이가 직접 고르기 전에는 종류를 바꾸면 그 종류의 힘을 따라감
+  const kindDefault = (id: string) => resolveAbility({ ability: null, kindName: kinds.find((x) => x.id === id)?.name, officialSeries }) ?? "none";
+  const [ab, setAb] = useState<string>(ability ?? kindDefault(kindId ?? ""));
+  const [abTouched, setAbTouched] = useState(ability !== null);
+  const chosen = isAbility(ab) ? ABILITIES[ab] : null;
   return (
     <form action={action} className="flex flex-col gap-6">
       <input type="hidden" name="kindId" value={k} />
       <input type="hidden" name="factionId" value={f} />
+      <input type="hidden" name="ability" value={ab} />
       {kinds.length ? (
-        <ChoiceGroup label="어떤 영웅이에요?" options={kinds.map((x) => ({ value: x.id, label: x.name }))} value={k} onChange={setK} />
+        <ChoiceGroup
+          label="어떤 영웅이에요?"
+          options={kinds.map((x) => ({ value: x.id, label: x.name }))}
+          value={k}
+          onChange={(v) => {
+            setK(v);
+            if (!abTouched) setAb(kindDefault(v));
+          }}
+        />
       ) : null}
       {factions.length ? (
         <ChoiceGroup
@@ -160,6 +181,21 @@ export function KindStep({
           onChange={setF}
         />
       ) : null}
+      <ChoiceGroup
+        label="카드 배틀 특별한 힘"
+        options={[...ABILITY_CHOICES.map((a) => ({ value: a, label: `${ABILITIES[a].icon} ${ABILITIES[a].name}` })), { value: "none", label: "없음 (대신 숫자 +1)" }]}
+        value={ab}
+        onChange={(v) => {
+          setAb(v);
+          setAbTouched(true);
+        }}
+      />
+      <div className="-mt-3 flex items-center gap-2 rounded-card bg-paper-dim px-4 py-3">
+        <p className="flex-1 text-[17px] font-bold" aria-live="polite">
+          {chosen ? `${chosen.icon} ${chosen.name}: ${chosen.text}` : "특별한 힘이 없는 대신 카드의 공격이나 체력이 1 더 높아요."}
+        </p>
+        <ReadAloudButton text={chosen ? `${chosen.name}. ${chosen.text}` : "특별한 힘이 없는 대신 카드가 조금 더 세요."} compact />
+      </div>
       <FormError>{state?.error}</FormError>
       <StepNav heroId={heroId} step={stepIndex("kind")}>
         <PrimaryButton type="submit" disabled={pending}>

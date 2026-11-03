@@ -9,6 +9,7 @@ import { STAT_COLOR, STAT_ORDER, type CharacterDetail } from "@/lib/characters/d
 import { getViewer, requireProfile } from "@/lib/family/viewer";
 import { getCharacterDetail } from "@/lib/queries/characters";
 
+import { AbilityBadge } from "@/components/battle/AbilityBadge";
 import { DrawingReplay } from "@/components/drawing/DrawingReplay";
 
 import { CollectButton, FlipCard, ReadAloudButton } from "./detail-client";
@@ -115,6 +116,7 @@ async function CharacterContent({ seriesSlug, slug }: { seriesSlug: string; slug
                   {c.creatorNickname ? `${c.creatorNickname}이(가) 만든 나만의 카드` : "우리 가족이 만든 나만의 카드"}
                 </p>
               ) : null}
+              <AbilityBadge ability={c.ability} />
               <p className="max-w-[520px] text-[19px] font-medium leading-relaxed text-muted">{c.summary}</p>
               <div className="flex flex-wrap gap-3 pt-2">
                 <ReadAloudButton text={readText} />

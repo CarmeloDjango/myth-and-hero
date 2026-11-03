@@ -157,6 +157,8 @@ model Character {
   avatarParts   Json?
   /// 그리기 획 데이터 JSON의 저장소 키 (Object Storage `drawings` 버킷)
   strokesUrl    String?
+  /// 카드 배틀 특별한 힘 (아이가 고름). null이면 종류에서 (공식 세계관), "none"이면 없음
+  ability       String?
   /// 밑그림 사진(JPEG)의 저장소 키. 사진 위에 덧그린 그림이 imageUrl입니다.
   backgroundUrl String?
   /// 영웅 마법사 입력값 (이야기 빈칸 답 등). 다시 고칠 때 채워 넣기 위해 보관합니다.

@@ -218,3 +218,28 @@ test("별 구간: ★5 261~300, ★4 221~260, ★3 171~220, ★2 121~170, ★1 1
   const { heroStars } = await import("../src/lib/heroes/rules");
   assert.deepEqual([300, 261, 260, 221, 220, 171, 170, 121, 120, 0].map(heroStars), [5, 5, 4, 4, 3, 3, 2, 2, 1, 1]);
 });
+
+test("🔥 불꽃: 낼 때 상대 대장에게 2 피해, 그걸로 이길 수도 있음", async () => {
+  const { RULES: R } = await import("../src/lib/battle/cards");
+  const fire = card(1, 1, 1, "fire");
+  const filler = Array.from({ length: 10 }, () => card(1, 1, 1));
+  let s = newBattle(setup("나", filler), setup("토리", filler), 11);
+  s = arrange(s, 0, { hand: [fire], energy: 1 });
+  s = applyAction(s, { type: "play", handIndex: 0 });
+  assert.equal(s.players[1].leader.hp, R.leaderHp - 2);
+  assert.ok(s.events.some((e) => e.type === "damage" && e.target === "leader" && e.amount === 2));
+  s = arrange(s, 0, { hand: [fire], energy: 1 });
+  s = arrange(s, 1, { leader: { ...s.players[1].leader, hp: 2 } });
+  s = applyAction(s, { type: "play", handIndex: 0 });
+  assert.equal(s.winner, 0);
+});
+
+test("특별한 힘 고르기: 고른 힘 > 공식 세계관 종류 > 없음", async () => {
+  const { resolveAbility } = await import("../src/lib/battle/cards");
+  assert.equal(resolveAbility({ ability: null, kindName: "장수", officialSeries: true }), "guard");
+  assert.equal(resolveAbility({ ability: "fire", kindName: "장수", officialSeries: true }), "fire");
+  assert.equal(resolveAbility({ ability: "none", kindName: "장수", officialSeries: true }), null);
+  assert.equal(resolveAbility({ ability: null, kindName: "영웅", officialSeries: false }), null, "아이 세계관 종류는 힘 없음");
+  assert.equal(resolveAbility({ ability: "charge", kindName: "티니핑", officialSeries: false }), "charge", "아이 세계관도 고르면 있음");
+  assert.equal(resolveAbility({ ability: "laser", kindName: null, officialSeries: true }), null, "없는 힘은 무시");
+});

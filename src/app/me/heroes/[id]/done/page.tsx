@@ -1,3 +1,5 @@
+import { AbilityBadge } from "@/components/battle/AbilityBadge";
+import { resolveAbility } from "@/lib/battle/cards";
 import { cardTint } from "@/lib/characters/browse";
 import { Suspense } from "react";
 import type { Metadata } from "next";
@@ -57,6 +59,13 @@ async function Done({ id }: { id: string }) {
         </div>
         <p className="p-4 font-display text-3xl">{hero.name}</p>
       </div>
+      <AbilityBadge
+        ability={resolveAbility({
+          ability: hero.ability,
+          kindName: hero.series.kinds.find((k) => k.id === hero.kindId)?.name,
+          officialSeries: hero.series.familyId === null,
+        })}
+      />
       <div className="flex flex-wrap justify-center gap-3">
         {src ? <DrawingReplay source={`/api/heroes/${hero.id}/drawing`} name={hero.name} background={tint} /> : null}
         <Link

@@ -12,13 +12,14 @@
  */
 import { heroStars } from "@/lib/heroes/rules";
 
-export type Ability = "guard" | "charge" | "scheme" | "divine";
+export type Ability = "guard" | "charge" | "scheme" | "divine" | "fire";
 
 export const ABILITIES: Record<Ability, { icon: string; name: string; text: string }> = {
   guard: { icon: "🛡️", name: "지키기", text: "상대는 이 카드부터 공격해야 해요." },
   charge: { icon: "💨", name: "돌격", text: "내자마자 공격할 수 있어요." },
   scheme: { icon: "📜", name: "꾀", text: "낼 때 카드를 1장 더 뽑아요." },
   divine: { icon: "✨", name: "신의 힘", text: "낼 때 상대 카드 모두에게 1 피해를 줘요." },
+  fire: { icon: "🔥", name: "불꽃", text: "낼 때 상대 대장에게 2 피해를 줘요." },
 };
 
 /** 종류 이름 → 특별한 힘 (공식 세계관의 종류) */
@@ -29,6 +30,21 @@ export const KIND_ABILITY: Record<string, Ability> = {
   책사: "scheme",
   신: "divine",
 };
+
+/** 영웅 만들기에서 고를 수 있는 특별한 힘 */
+export const ABILITY_CHOICES: Ability[] = ["guard", "charge", "scheme", "divine", "fire"];
+export const isAbility = (v: unknown): v is Ability => typeof v === "string" && (ABILITY_CHOICES as string[]).includes(v);
+
+/**
+ * 인물의 특별한 힘
+ * - 아이가 고른 값이 있으면 그 값 ("none"이면 없음)
+ * - 없으면 공식 세계관의 종류에서 (장수 🛡️ …), 아이가 만든 세계관의 종류는 없음
+ */
+export function resolveAbility(c: { ability: string | null | undefined; kindName: string | null | undefined; officialSeries: boolean }): Ability | null {
+  if (c.ability === "none") return null;
+  if (isAbility(c.ability)) return c.ability;
+  return c.officialSeries && c.kindName ? (KIND_ABILITY[c.kindName] ?? null) : null;
+}
 
 export type CardDef = {
   /** 인물 id */

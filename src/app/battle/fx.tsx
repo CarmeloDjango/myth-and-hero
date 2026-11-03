@@ -91,7 +91,7 @@ export function AbilityBurst({ ability }: { ability: Ability }) {
       </span>
     );
   }
-  const icon = ability === "guard" ? "🛡️" : ability === "scheme" ? "📜 +1장" : "✨";
+  const icon = ability === "guard" ? "🛡️" : ability === "scheme" ? "📜 +1장" : ability === "fire" ? "🔥🔥" : "✨";
   return (
     <span aria-hidden="true" className="battle-anim pointer-events-none absolute left-1/2 top-1/2 z-20 whitespace-nowrap rounded-button text-5xl font-black drop-shadow-lg [animation:pop-fade_.9s_ease-out_forwards]">
       {ability === "scheme" ? <span className="rounded-button bg-paper px-2 text-2xl text-ink">{icon}</span> : icon}

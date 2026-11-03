@@ -82,6 +82,8 @@ export type CharacterDetail = {
   faction: { name: string; color: string | null } | null;
   /** 카드 배경색: 편 색, 편이 없으면 종류 색 */
   tint: string;
+  /** 카드 배틀 특별한 힘 */
+  ability: import("@/lib/battle/cards").Ability | null;
   /** 아이가 만든 카드("나만의 카드")인지 */
   isFamily: boolean;
   /** 카드 그림 주소: 아이가 만든 영웅의 그림, 또는 공식 인물에 우리 가족이 붙인 그림 (없으면 null) */

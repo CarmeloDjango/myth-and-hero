@@ -18,6 +18,7 @@ import {
 } from "@/lib/characters/detail";
 import { getDb } from "@/lib/db";
 import { characterPictureSrc, heroImageSrc, isPhotoPicture } from "@/lib/heroes/image";
+import { resolveAbility } from "@/lib/battle/cards";
 import { cardTint } from "@/lib/characters/browse";
 import { isChoseongOnly } from "@/lib/search/choseong";
 
@@ -200,11 +201,12 @@ export async function getCharacterDetail(
       imageUrl: true,
       strokesUrl: true,
       creatorId: true,
+      ability: true,
       familyPictures: { where: { familyId: familyId ?? "-" }, select: { imageUrl: true, strokesUrl: true }, take: 1 },
       creator: { select: { nickname: true } },
       kind: { select: { name: true, color: true } },
       faction: { select: { name: true, color: true } },
-      series: { select: { slug: true, name: true, statLabels: true } },
+      series: { select: { slug: true, name: true, statLabels: true, familyId: true } },
     },
   });
   if (!c) return null;
@@ -266,6 +268,7 @@ export async function getCharacterDetail(
     stats: { stat1: c.stat1, stat2: c.stat2, stat3: c.stat3, stat4: c.stat4, stat5: c.stat5 },
     faction: c.faction,
     tint: cardTint(c.faction, c.kind),
+    ability: resolveAbility({ ability: c.ability, kindName: c.kind?.name, officialSeries: c.series.familyId === null }),
     isFamily: c.familyId !== null,
     imageSrc: heroImageSrc(c) ?? characterPictureSrc(c.id, picture?.imageUrl),
     imageCover: isPhotoPicture(c.imageUrl ?? picture?.imageUrl),
